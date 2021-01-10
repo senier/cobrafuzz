@@ -51,7 +51,7 @@ or hangs/they run more the the specified timeout limit per testcase.
 The next step is to download pythonfuzz and then run your fuzzer
 
 ```bash
-pip install pythonfuzz
+pip install --extra-index-url https://gitlab.com/api/v4/projects/19904939/packages/pypi/simple pythonfuzz
 python examples/htmlparser/fuzz.py
 
 #394378 NEW     cov: 608 corp: 24 exec/s: 1119 rss: 10.73828125 MB
