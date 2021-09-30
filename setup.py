@@ -15,8 +15,6 @@ setuptools.setup(
     install_requires=[
         # WARNING: Keep these values in line with those in requirements.txt
         "psutil==5.6.3",
-        "numpy==1.16.6; python_version < '3'",
-        "numpy==1.17.3; python_version >= '3'",
         "functools32==3.2.3.post2; python_version < '3'",
     ],
     classifiers=[
