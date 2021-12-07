@@ -7,6 +7,7 @@ import hashlib
 import logging
 import functools
 import multiprocessing as mp
+mp.set_start_method('fork')
 
 from pythonfuzz import corpus, tracer
 
