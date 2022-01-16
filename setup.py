@@ -5,10 +5,9 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="pythonfuzz",
-    version="1.0.3",
-    author="fuzzit.dev",
-    author_email="support@fuzzit.dev",
-    description="coverage-guided fuzz testing for python",
+    version="1.0.9",
+    author="GitLab B.V.",
+    description="Coverage-guided fuzz testing for Python",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/fuzzitdev/pythonfuzz",
