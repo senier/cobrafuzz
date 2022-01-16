@@ -91,6 +91,12 @@ PythonFuzz tries to mimic some of the arguments and output style from [libFuzzer
 More fuzz targets examples (for real and popular libraries) are located under the examples directory and
 bugs that were found using those targets are listed in the trophies section.
 
+## Release Process
+
+1. Bump the release version in [setup.py](setup.py).
+2. The release is automatically pushed to [pythonfuzz repository](https://gitlab.com/gitlab-org/security-products/analyzers/fuzzers/pythonfuzz)
+via `.gitlab-ci.yaml` `deploy` stage. This is triggered after creating the tag.
+
 ## Credits & Acknowledgments
 
 PythonFuzz is a port of [fuzzitdev/jsfuzz](https://github.com/fuzzitdev/jsfuzz)
