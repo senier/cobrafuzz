@@ -30,7 +30,7 @@ def worker(target, child_conn, close_fd_mask):
         def write(self, x):
             pass
     logging.captureWarnings(True)
-    logging.getLogger().setLevel(logging.CRITICAL)
+    logging.getLogger().setLevel(logging.ERROR)
     if close_fd_mask & 1:
         sys.stdout = DummyFile()
     if close_fd_mask & 2:
@@ -93,7 +93,13 @@ class Fuzzer(object):
         if self._exact_artifact_path:
             crash_path = self._exact_artifact_path
         else:
-            crash_path = prefix + m.hexdigest()
+            dir_path = 'crashes'
+            isExist = os.path.exists(dir_path)
+            if not isExist:
+              os.makedirs(dir_path)
+              logging.info("The crashes directory is created")
+
+            crash_path = dir_path + "/" + prefix + m.hexdigest()
         with open(crash_path, 'wb') as f:
             f.write(buf)
         logging.info('sample was written to {}'.format(crash_path))
@@ -102,7 +108,7 @@ class Fuzzer(object):
 
     def start(self):
         logging.info("#0 READ units: {}".format(self._corpus.length))
-
+        exit_code = 0
         parent_conn, child_conn = mp.Pipe()
         self._p = mp.Process(target=worker, args=(self._target, child_conn, self._close_fd_mask))
         self._p.start()
@@ -126,6 +132,7 @@ class Fuzzer(object):
                 total_coverage = int(parent_conn.recv_bytes())
             except ValueError:
                 self.write_sample(buf)
+                exit_code = 76
                 break
 
             self._total_executions += 1
@@ -146,3 +153,4 @@ class Fuzzer(object):
                 break
 
         self._p.join()
+        sys.exit(exit_code)
