@@ -5,12 +5,11 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="pythonfuzz",
-    version="1.0.9",
+    version="1.0.10",
     author="GitLab B.V.",
     description="Coverage-guided fuzz testing for Python",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/fuzzitdev/pythonfuzz",
     install_requires=[
         # WARNING: Keep these values in line with those in requirements.txt
         "psutil==5.6.3",
