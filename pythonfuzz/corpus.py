@@ -106,7 +106,9 @@ class Corpus(object):
     def mutate(self, buf):
         res = buf[:]
         nm = self._rand_exp()
-        for i in range(nm):
+        i = 0
+        while i != nm:
+            i += 1
             # Remove a range of bytes.
             x = self._rand(15)
             if x == 0:
