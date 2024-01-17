@@ -1,6 +1,8 @@
-# pythonfuzz: coverage-guided fuzz testing for python
+This is a fork of [pythonfuzz](https://gitlab.com/gitlab-org/security-products/analyzers/fuzzers/pythonfuzz).
 
-PythonFuzz is coverage-guided [fuzzer](https://developer.mozilla.org/en-US/docs/Glossary/Fuzzing) for testing python packages.
+# cobrafuzz: coverage-guided fuzz testing for python
+
+CobraFuzz is coverage-guided [fuzzer](https://developer.mozilla.org/en-US/docs/Glossary/Fuzzing) for testing python packages.
 
 Fuzzing for safe languages like python is a powerful strategy for finding bugs like unhandled exceptions, logic bugs,
 security bugs that arise from both logic bugs and Denial-of-Service caused by hangs and excessive memory usage.
@@ -48,10 +50,10 @@ or hangs/they run more the the specified timeout limit per testcase.
 
 ### Running
 
-The next step is to download pythonfuzz and then run your fuzzer
+The next step is to download cobrafuzz and then run your fuzzer
 
 ```bash
-pip install --extra-index-url https://gitlab.com/api/v4/projects/19904939/packages/pypi/simple pythonfuzz
+pip install cobrafuzz
 python examples/htmlparser/fuzz.py
 
 #394378 NEW     cov: 608 corp: 24 exec/s: 1119 rss: 10.73828125 MB
@@ -80,26 +82,24 @@ This example quickly finds an an unhandled exception/flow in a few minutes.
 
 ### Corpus
 
-PythonFuzz will generate and test various inputs in an infinite loop. `corpus` is optional directory and will be used to
+CobraFuzz will generate and test various inputs in an infinite loop. `corpus` is optional directory and will be used to
 save the generated testcases so later runs can be started from the same point and provided as seed corpus.
 
-PythonFuzz can also start with an empty directory (i.e no seed corpus) though some valid test-cases in the seed corpus
+CobraFuzz can also start with an empty directory (i.e no seed corpus) though some valid test-cases in the seed corpus
 may speed up the fuzzing substantially.  
 
-PythonFuzz tries to mimic some of the arguments and output style from [libFuzzer](https://llvm.org/docs/LibFuzzer.html).
+CobraFuzz tries to mimic some of the arguments and output style from [libFuzzer](https://llvm.org/docs/LibFuzzer.html).
 
 More fuzz targets examples (for real and popular libraries) are located under the examples directory and
 bugs that were found using those targets are listed in the trophies section.
 
 ## Release Process
 
-1. Bump the release version in [setup.py](setup.py).
-2. The release is automatically pushed to [pythonfuzz repository](https://gitlab.com/gitlab-org/security-products/analyzers/fuzzers/pythonfuzz)
-via `.gitlab-ci.yaml` `deploy` stage. This is triggered after creating the tag.
+TBD
 
 ## Credits & Acknowledgments
 
-PythonFuzz is a port of [fuzzitdev/jsfuzz](https://github.com/fuzzitdev/jsfuzz)
+CobraFuzz is a fork of PythonFuzz which is a port of [fuzzitdev/jsfuzz](https://github.com/fuzzitdev/jsfuzz)
 
 which is in turn heavily based on [go-fuzz](https://github.com/dvyukov/go-fuzz) originally developed by [Dmitry Vyukov's](https://twitter.com/dvyukov).
 Which is in turn heavily based on [Michal Zalewski](https://twitter.com/lcamtuf) [AFL](http://lcamtuf.coredump.cx/afl/).
@@ -116,4 +116,4 @@ any unnecessary work is done.
 * [python built-in HTMLParser - unhandled exception](https://bugs.python.org/msg355287), [twice](https://bugs.launchpad.net/beautifulsoup/+bug/1883104)
 * [beautifulsoup](https://bugs.launchpad.net/beautifulsoup/+bug/1883264)
 
-**Feel free to add bugs that you found with pythonfuzz to this list via pull-request**
+**Feel free to add bugs that you found with cobrafuzz to this list via pull-request**
