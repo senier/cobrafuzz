@@ -1,0 +1,209 @@
+[build-system]
+requires = ['setuptools>=64', 'wheel']
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = "cobrafuzz"
+version = "1.0.12"
+authors = [
+    {name = "Alexander Senier", email = "mail@senier.net"}
+]
+description = "Coverage-guided fuzz testing for Python"
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Testing",
+]
+requires-python = '>=3.5.3'
+dependencies = [
+    "psutil <6",
+]
+
+[project.optional-dependencies]
+devel = [
+    "black ==23.12.1",
+    "build ==1.0.3",
+    "mypy ==1.8.0",
+    "pytest ==7.4.4",
+    "pytest-cov ==4.1.0",
+    "pytest-xdist ==3.5.0",
+    "python-kacl ==0.4.6",
+    "ruff ==0.1.13",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["examples.*", "tests.*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.ruff]
+target-version = "py38"
+select = [
+    "F",     # pyflakes
+    "E",     # pycodestyle
+    "W",     # pycodestyle
+    "I",     # isort
+    "N",     # pep8-naming
+    "D",     # pydocstyle
+    "UP",    # pyupgrade
+    "YTT",   # flake8-2020
+    "ASYNC", # flake8-async
+    "S",     # flake8-bandit
+    "BLE",   # flake8-blind-except
+    "FBT",   # flake8-boolean-trap
+    "B",     # flake8-bugbear
+    "A",     # flake8-builtins
+    "COM",   # flake8-commas
+    "C4",    # flake8-comprehensions
+    "DTZ",   # flake8-datetimez
+    "T10",   # flake8-debugger
+    "EXE",   # flake8-executable
+    "FA",    # flake8-future-annotations
+    "ISC",   # flake8-implicit-str-concat
+    "ICN",   # flake8-import-conventions
+    "G",     # flake8-logging-format
+    "INP",   # flake8-no-pep420
+    "PIE",   # flake8-pie
+    "T20",   # flake8-print
+    "PYI",   # flake8-pyi
+    "PT",    # flake8-pytest-style
+    "Q",     # flake8-quotes
+    "RSE",   # flake8-raise
+    "RET",   # flake8-return
+    "SLF",   # flake8-self
+    "SLOT",  # flake8-slots
+    "SIM",   # flake8-simplify
+    "TID",   # flake8-tidy-imports
+    "INT",   # flake8-gettext
+    "ARG",   # flake8-unused-arguments
+    "PTH",   # flake8-use-pathlib
+    "TD",    # flake8-todos
+    "FIX",   # flake8-fixme
+    "PGH",   # pygrep-hooks
+    "PL",    # pylint
+    "TRY",   # tryceratops
+    "FLY",   # flynt
+    "PERF",  # Perflint
+    "RUF"    # ruff
+]
+ignore = [
+    "D100",    # public-module
+    "D101",    # public-class
+    "D102",    # public-method
+    "D103",    # public-function
+    "D104",    # public-package
+    "D105",    # magic-method
+    "D106",    # public-nested-class
+    "D107",    # public-init
+    "D202",    # no-blank-line-after-function
+    "D203",    # one-blank-line-before-class
+    "D212",    # multi-line-summary-first-line
+    "E741",    # ambiguous-variable-name
+    "UP007",   # typing-union
+    "S101",    # assert
+    "S105",    # hardcoded-password-string
+    "S603",    # subprocess-without-shell-equals-true
+    "S607",    # start-process-with-partial-path
+    "FBT001",  # boolean-positional-arg-in-function-definition
+    "FBT002",  # boolean-default-value-in-function-definition
+    "B011",    # assert-false
+    "PT015",   # pytest-assert-always-false
+    "RET503",  # implicit-return
+    "TD003",   # missing-todo-link
+    "FIX002",  # line-contains-todo
+    "PLC0414", # useless-import-alias
+    "PLC1901", # compare-to-empty-string
+    "PLR2004", # magic-value-comparison
+    "PLR5501", # collapsible-else-if
+    "TRY003",  # raise-vanilla-args
+    "RUF001",  # ambiguous-unicode-character-string
+]
+line-length = 100
+
+[tool.ruff.isort]
+combine-as-imports = true
+known-third-party = [
+    'gi',
+    'icontract',
+    'pydantic',
+    'pydotplus',
+    'pytest',
+    'z3',
+]
+
+[tool.ruff.pylint]
+max-args = 6
+max-branches = 12
+max-returns = 10
+max-statements = 50
+
+[tool.mypy]
+mypy_path = 'stubs'
+check_untyped_defs = true
+disallow_any_explicit = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+no_implicit_reexport = true
+show_error_codes = true
+strict_equality = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+warn_unused_configs = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = [
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = '--tb=short'
+filterwarnings = [
+    'ignore:visit_NameConstant is deprecated; add visit_Constant:PendingDeprecationWarning',
+    'ignore:visit_Str is deprecated; add visit_Constant:PendingDeprecationWarning',
+]
+
+[tool.coverage.run]
+branch = true
+concurrency = ['multiprocessing', 'thread']
+parallel = true
+sigterm = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 100
+exclude_lines = [
+    'pragma: no cover',
+    'assert False',
+    'assert_never',
+    'def __repr__',
+    'def __str__',
+    'if TYPE_CHECKING:',
+    'raise NotImplementedError',
+    'return NotImplemented',
+]

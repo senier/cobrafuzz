@@ -5,3 +5,6 @@ crash-*
 dist/
 build/
 pythonfuzz.egg-info/
+/.venv
+/.devel_installed
+/cobrafuzz.egg-info
