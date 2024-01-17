@@ -1,6 +1,6 @@
-This is a fork of [pythonfuzz](https://gitlab.com/gitlab-org/security-products/analyzers/fuzzers/pythonfuzz).
-
 # cobrafuzz: coverage-guided fuzz testing for python
+
+This is a fork of [pythonfuzz](https://gitlab.com/gitlab-org/security-products/analyzers/fuzzers/pythonfuzz).
 
 CobraFuzz is coverage-guided [fuzzer](https://developer.mozilla.org/en-US/docs/Glossary/Fuzzing) for testing python packages.
 
@@ -39,14 +39,10 @@ Features of the fuzz target:
 
 * fuzz will call the fuzz target in an infinite loop with random data (according to the coverage guided algorithm) passed to `buf`( in a separate process).
 * The function must catch and ignore any expected exceptions that arise when passing invalid input to the tested package.
-* The fuzz target must call the test function/library with with the passed buffer or a transformation on the test buffer 
-if the structure is different or from different type.
-* Fuzz functions can also implement application level checks to catch application/logical bugs - For example: 
-decode the buffer with the testable library, encode it again, and check that both results are equal. To communicate the results
-the result/bug the function should throw an exception.
+* The fuzz target must call the test function/library with with the passed buffer or a transformation on the test buffer if the structure is different or from different type.
+* Fuzz functions can also implement application level checks to catch application/logical bugs - For example: decode the buffer with the testable library, encode it again, and check that both results are equal. To communicate the results the result/bug the function should throw an exception.
 * pythonfuzz will report any unhandled exceptions as crashes as well as inputs that hit the memory limit specified to pythonfuzz
 or hangs/they run more the the specified timeout limit per testcase.
-
 
 ### Running
 
@@ -110,10 +106,9 @@ Contributions are welcome!:) There are still a lot of things to improve, and tes
 issues section. Before doing any major contribution please open an issue so we can discuss and help guide the process before
 any unnecessary work is done.
 
-
 ## Trophies
 
 * [python built-in HTMLParser - unhandled exception](https://bugs.python.org/msg355287), [twice](https://bugs.launchpad.net/beautifulsoup/+bug/1883104)
 * [beautifulsoup](https://bugs.launchpad.net/beautifulsoup/+bug/1883264)
 
-**Feel free to add bugs that you found with cobrafuzz to this list via pull-request**
+Feel free to add bugs that you found with cobrafuzz to this list via pull-request
