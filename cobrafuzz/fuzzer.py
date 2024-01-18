@@ -15,7 +15,7 @@ import psutil
 # TODO(senier): #1
 mp.set_start_method("fork")
 
-from pythonfuzz import corpus, tracer  # noqa: E402, ref:#1
+from cobrafuzz import corpus, tracer  # noqa: E402, ref:#1
 
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 logging.getLogger().setLevel(logging.DEBUG)

@@ -1,4 +1,4 @@
-from pythonfuzz import corpus
+from cobrafuzz import corpus
 
 
 def test_remove() -> None:

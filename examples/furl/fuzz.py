@@ -1,9 +1,9 @@
+from cobrafuzz.main import CobraFuzz
+
 from furl import furl
 
-from pythonfuzz.main import PythonFuzz
 
-
-@PythonFuzz
+@CobraFuzz
 def fuzz(buf):
     try:
         string = buf.decode("ascii")

@@ -1,14 +1,14 @@
-import xml.etree.ElementTree as et
+from xml.etree import ElementTree
 from xml.etree.ElementTree import ParseError
 
-from pythonfuzz.main import PythonFuzz
+from cobrafuzz.main import CobraFuzz
 
 
-@PythonFuzz
+@CobraFuzz
 def fuzz(buf):
     try:
         string = buf.decode("utf-8")
-        et.fromstring(string)  # noqa: S314
+        ElementTree.fromstring(string)  # noqa: S314
     except (UnicodeDecodeError, ParseError):
         pass
 

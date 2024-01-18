@@ -1,10 +1,9 @@
 import requests
 from bs4 import BeautifulSoup as bs
+from cobrafuzz.main import CobraFuzz
 
-from pythonfuzz.main import PythonFuzz
 
-
-@PythonFuzz
+@CobraFuzz
 def fuzz(buf):
     try:
         url = buf.decode("ascii")

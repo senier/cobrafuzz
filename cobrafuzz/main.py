@@ -1,10 +1,10 @@
 import argparse
 from typing import Callable
 
-from pythonfuzz import fuzzer
+from cobrafuzz import fuzzer
 
 
-class PythonFuzz:
+class CobraFuzz:
     def __init__(self, func: Callable[[bytes], None]):
         self.function = func
 

@@ -18,10 +18,10 @@ target). Here is an example of a simple fuzz function for the built-in `html` mo
 
 ```python
 from html.parser import HTMLParser
-from pythonfuzz.main import PythonFuzz
+from cobrafuzz.main import CobraFuzz
 
 
-@PythonFuzz
+@CobraFuzz
 def fuzz(buf):
     try:
         string = buf.decode("ascii")
@@ -41,7 +41,7 @@ Features of the fuzz target:
 * The function must catch and ignore any expected exceptions that arise when passing invalid input to the tested package.
 * The fuzz target must call the test function/library with with the passed buffer or a transformation on the test buffer if the structure is different or from different type.
 * Fuzz functions can also implement application level checks to catch application/logical bugs - For example: decode the buffer with the testable library, encode it again, and check that both results are equal. To communicate the results the result/bug the function should throw an exception.
-* pythonfuzz will report any unhandled exceptions as crashes as well as inputs that hit the memory limit specified to pythonfuzz
+* cobrafuzz will report any unhandled exceptions as crashes as well as inputs that hit the memory limit specified to cobrafuzz
 or hangs/they run more the the specified timeout limit per testcase.
 
 ### Running

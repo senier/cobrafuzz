@@ -2,10 +2,10 @@ import io
 import zipfile
 
 # from html.parser import HTMLParser
-from pythonfuzz.main import PythonFuzz
+from cobrafuzz.main import CobraFuzz
 
 
-@PythonFuzz
+@CobraFuzz
 def fuzz(buf):
     # try:
     #     string = buf.decode("utf-8")

@@ -1,8 +1,9 @@
+from cobrafuzz.main import CobraFuzz
+
 import isort
-from pythonfuzz.main import PythonFuzz
 
 
-@PythonFuzz
+@CobraFuzz
 def fuzz(buf):
     try:
         string = buf.decode("ascii")
