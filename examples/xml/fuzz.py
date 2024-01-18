@@ -1,5 +1,6 @@
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as et
 from xml.etree.ElementTree import ParseError
+
 from pythonfuzz.main import PythonFuzz
 
 
@@ -7,10 +8,10 @@ from pythonfuzz.main import PythonFuzz
 def fuzz(buf):
     try:
         string = buf.decode("utf-8")
-        ET.fromstring(string)
+        et.fromstring(string)  # noqa: S314
     except (UnicodeDecodeError, ParseError):
         pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     fuzz()
