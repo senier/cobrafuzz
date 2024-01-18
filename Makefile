@@ -30,6 +30,7 @@ test_build: .devel_installed
 install_devel: .devel_installed
 
 .devel_installed:
+	pip install -U pip
 	pip install -e .[devel]
 	touch $@
 
