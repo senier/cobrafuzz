@@ -1,15 +1,15 @@
 import pytest
-import zipfile
-import io
 
 from pythonfuzz import fuzzer
 
 
-def test_find_crash():
-    def fuzz(buf):
-        f = io.BytesIO(buf)
-        z = zipfile.ZipFile(f)
-        z.testzip()
+class NewExceptionError(Exception):
+    pass
+
+
+def test_find_crash() -> None:
+    def fuzz(_: bytes) -> None:
+        raise NewExceptionError
 
     with pytest.raises(SystemExit, match="^76$"):
-        fuzzer.Fuzzer(fuzz).start()
+        fuzzer.Fuzzer(fuzz, timeout=5, runs=1).start()

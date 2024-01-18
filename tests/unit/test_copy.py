@@ -1,69 +1,67 @@
 from pythonfuzz import corpus
-import unittest
-
-class TestCopy(unittest.TestCase):
-    def test_remove(self):
-        "test if copy function works as intended in remove operation"
-
-        res = bytearray(b"abcdefg")
-
-        pos0 = 4
-        pos1 = 5
-
-        corpus.Corpus.copy(res, res, pos1, pos0)
-
-        res = res[:len(res) - (pos1-pos0)]
-        self.assertEqual(b"abcdfg", res)
-    
-    def test_insert(self):
-        "test if copy function works as intended in insert operation"
-
-        res = bytearray(b"abcdefg")
-        pos = 3
-        n = 5
-
-        for k in range(n):
-            res.append(0)
-
-        corpus.Corpus.copy(res, res, pos, pos + n)
-
-        for k in range(n):
-            res[pos+k] = ord('Z')
-
-        self.assertEqual(b"abcZZZZZdefg", res)
-
-    def test_duplicate(self):
-        "test if copy function works as intended in duplicate operation"
-
-        res = bytearray(b"abcdefg")
-
-        src = 4
-        dst = 5
-        n = 2
-
-        tmp = bytearray(n)
-        corpus.Corpus.copy(res, tmp, src, 0)
-        self.assertEqual(b"ef", tmp)
-
-        for k in range(n):
-            res.append(0)
-        corpus.Corpus.copy(res, res, dst, dst+n)
-        for k in range(n):
-            res[dst+k] = tmp[k]
-        self.assertEqual(b"abcdeeffg", res)
-
-    def test_copy(self):
-        "test if copy function works as intended in copy operation"
-
-        res = bytearray(b"abcdefg")
-
-        src = 4
-        dst = 5
-        n = 2
-
-        corpus.Corpus.copy(res, res, src, dst, src+n)
-        self.assertEqual(b"abcdeef", res)
 
 
-if __name__ == '__main__':
-    unittest.main()
+def test_remove() -> None:
+    """Test if copy function works as intended in remove operation."""
+
+    res = bytearray(b"abcdefg")
+
+    pos0 = 4
+    pos1 = 5
+
+    corpus.Corpus.copy(res, res, pos1, pos0)
+
+    res = res[: len(res) - (pos1 - pos0)]
+    assert res == b"abcdfg"
+
+
+def test_insert() -> None:
+    """Test if copy function works as intended in insert operation."""
+
+    res = bytearray(b"abcdefg")
+    pos = 3
+    n = 5
+
+    for _ in range(n):
+        res.append(0)
+
+    corpus.Corpus.copy(res, res, pos, pos + n)
+
+    for k in range(n):
+        res[pos + k] = ord("Z")
+
+    assert res == b"abcZZZZZdefg"
+
+
+def test_duplicate() -> None:
+    """Test if copy function works as intended in duplicate operation."""
+
+    res = bytearray(b"abcdefg")
+
+    src = 4
+    dst = 5
+    n = 2
+
+    tmp = bytearray(n)
+    corpus.Corpus.copy(res, tmp, src, 0)
+    assert tmp == b"ef"
+
+    for _ in range(n):
+        res.append(0)
+    corpus.Corpus.copy(res, res, dst, dst + n)
+    for k in range(n):
+        res[dst + k] = tmp[k]
+    assert res == b"abcdeeffg"
+
+
+def test_copy() -> None:
+    """Test if copy function works as intended in copy operation."""
+
+    res = bytearray(b"abcdefg")
+
+    src = 4
+    dst = 5
+    n = 2
+
+    corpus.Corpus.copy(res, res, src, dst, src + n)
+    assert res == b"abcdeef"

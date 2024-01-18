@@ -1,4 +1,5 @@
 from html.parser import HTMLParser
+
 from pythonfuzz.main import PythonFuzz
 
 
@@ -12,5 +13,5 @@ def fuzz(buf):
         pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     fuzz()
