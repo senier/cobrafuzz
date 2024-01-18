@@ -1,9 +1,9 @@
 import zlib
 
-from pythonfuzz.main import PythonFuzz
+from cobrafuzz.main import CobraFuzz
 
 
-@PythonFuzz
+@CobraFuzz
 def fuzz(buf):
     try:  # noqa: SIM105
         zlib.decompress(buf)

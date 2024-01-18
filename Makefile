@@ -1,4 +1,4 @@
-PYTHON_PACKAGES = pythonfuzz/*.py tests/**/*.py
+PYTHON_PACKAGES = cobrafuzz/*.py tests/**/*.py
 
 all: check test
 
@@ -38,6 +38,6 @@ format:
 	black $(PYTHON_PACKAGES)
 
 clean:
-	rm -rf dist cobrafuzz.egg-info crashes .devel_installed
+	rm -rf dist cobrafuzz.egg-info crashes .devel_installed .ruff_cache build .venv
 
 .PHONY: check check_black check_kacl check_mypy check_ruff test test_build test_integration test_unit install_devel

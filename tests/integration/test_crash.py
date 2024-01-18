@@ -1,6 +1,6 @@
 import pytest
 
-from pythonfuzz import fuzzer
+from cobrafuzz import fuzzer
 
 
 class NewExceptionError(Exception):
