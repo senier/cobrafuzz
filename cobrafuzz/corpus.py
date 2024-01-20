@@ -73,6 +73,13 @@ class Corpus:
 
     @staticmethod
     def _choose_len(n: int) -> int:
+        """
+        Choose a length based on input value.
+
+        With 90% probability, choose a random value in [1, n] (if n <=  8, otherwise [1, 8])
+        With  9% probability, choose a random value in [1, n] (if n <= 32, otherwise [1, 32])
+        With  1% probability, choose a random value in [1, n]
+        """
         x = Corpus._rand(100)
         if x < 90:
             return Corpus._rand(min(8, n)) + 1
