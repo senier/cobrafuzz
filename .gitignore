@@ -9,3 +9,4 @@ build/
 /cobrafuzz.egg-info
 /crashes
 /.coverage
+/coverage.xml
