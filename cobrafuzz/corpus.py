@@ -40,6 +40,8 @@ class Corpus:
         self._seed_run_finished = not self._inputs
         self._seed_idx = 0
         self._save_corpus: bool = bool(self._dirs) and self._dirs[0].is_dir()
+
+        # TODO(senier): Why this additional 0 element?
         self._inputs.append(bytearray(0))
 
     def _add_file(self, path: Path) -> None:
