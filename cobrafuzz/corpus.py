@@ -104,9 +104,7 @@ class Corpus:
     def put(self, buf: bytearray) -> None:
         self._inputs.append(buf)
         if self._save_corpus:
-            m = hashlib.sha256()
-            m.update(buf)
-            fname = self._dirs[0] / m.hexdigest()
+            fname = self._dirs[0] / hashlib.sha256(buf).hexdigest()
             with fname.open("wb") as f:
                 f.write(buf)
 
