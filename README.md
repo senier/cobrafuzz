@@ -102,9 +102,7 @@ Which is in turn heavily based on [Michal Zalewski](https://twitter.com/lcamtuf)
 
 ## Contributions
 
-Contributions are welcome!:) There are still a lot of things to improve, and tests and features to add. We will slowly post those in the
-issues section. Before doing any major contribution please open an issue so we can discuss and help guide the process before
-any unnecessary work is done.
+Contributions are welcome, feel free to open issues and pull requests.
 
 ## Trophies
 
