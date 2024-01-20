@@ -8,3 +8,4 @@ build/
 /.devel_installed
 /cobrafuzz.egg-info
 /crashes
+/.coverage
