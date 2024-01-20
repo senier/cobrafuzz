@@ -1,6 +1,6 @@
 from __future__ import annotations
-import hashlib
 
+import hashlib
 from pathlib import Path
 
 import numpy as np
@@ -67,7 +67,7 @@ def test_rand_uniform() -> None:
     assert Corpus.rand(1) == 0
 
     data = [Corpus.rand(10) for _ in range(1, 1000000)]
-    result = chisquare(f_obs=np.bincount(data))
+    result = chisquare(f_obs=list(np.bincount(data)))
     assert result.pvalue > 0.05
 
 
@@ -119,13 +119,13 @@ def test_choose_length() -> None:
 
 def test_put_corpus_not_saved() -> None:
     c = Corpus()
-    c.put(b"deadbeef")
+    c.put(bytearray(b"deadbeef"))
     assert c.inputs == [bytearray(0), bytearray(b"deadbeef")]
 
 
 def test_put_corpus_saved(tmpdir: Path) -> None:
     c = Corpus(dirs=[Path(tmpdir)])
-    c.put(b"deadbeef")
+    c.put(bytearray(b"deadbeef"))
     outfile = Path(tmpdir) / hashlib.sha256(b"deadbeef").hexdigest()
     assert c.inputs == [bytearray(0), bytearray(b"deadbeef")]
     assert outfile.exists()
