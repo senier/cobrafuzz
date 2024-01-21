@@ -16,20 +16,6 @@ INTERESTING16 = [0, 128, 255, 256, 512, 1000, 1024, 4096, 32767, 65535]
 INTERESTING32 = [0, 1, 32768, 65535, 65536, 100663045, 2147483647, 4294967295]
 
 
-def copy(
-    src: bytearray,
-    dst: bytearray,
-    start_source: int,
-    start_dst: int,
-    end_source: Optional[int] = None,
-    end_dst: Optional[int] = None,
-) -> None:
-    end_source = len(src) if end_source is None else end_source
-    end_dst = len(dst) if end_dst is None else end_dst
-    byte_to_copy = min(end_source - start_source, end_dst - start_dst)
-    dst[start_dst : start_dst + byte_to_copy] = src[start_source : start_source + byte_to_copy]
-
-
 def _rand(n: int) -> int:
     if n < 2:
         return 0
@@ -66,7 +52,7 @@ def _choose_len(n: int) -> int:
 
 
 def _mutate_remove_range_of_bytes(res: bytearray) -> bool:
-    if len(res) <= 1:
+    if len(res) < 2:
         return False
     start = _rand(len(res))
     util.remove(data=res, start=start, length=_choose_len(len(res) - start))
@@ -81,63 +67,52 @@ def _mutate_insert_range_of_bytes(res: bytearray) -> bool:
 
 
 def _mutate_duplicate_range_of_bytes(res: bytearray) -> bool:
-    if len(res) <= 1:
+    if len(res) < 2:
         return False
     src = _rand(len(res))
     dst = _rand(len(res))
-    while src == dst:
-        dst = _rand(len(res))
     n = _choose_len(len(res) - src)
-    tmp = bytearray(n)
-    copy(res, tmp, src, 0)
-    for _ in range(n):
-        res.append(0)
-    copy(res, res, dst, dst + n)
-    for k in range(n):
-        res[dst + k] = tmp[k]
+    util.insert(res, dst, res[src : src + n])
     return True
 
 
 def _mutate_copy_range_of_bytes(res: bytearray) -> bool:
-    if len(res) <= 1:
+    if len(res) < 2:
         return False
     src = _rand(len(res))
     dst = _rand(len(res))
-    while src == dst:
-        dst = _rand(len(res))
-    n = _choose_len(len(res) - src)
-    copy(res, res, src, dst, src + n)
+    n = _choose_len(min(len(res) - src, len(res) - dst))
+    util.copy(res, src, dst, n)
     return True
 
 
 def _mutate_bit_flip(res: bytearray) -> bool:
-    if len(res) == 0:
+    if len(res) < 1:
         return False
     pos = _rand(len(res))
     res[pos] ^= 1 << _rand(8)
     return True
 
 
-def _mutate_set_byte_to_random_value(res: bytearray) -> bool:
-    if len(res) == 0:
+def _mutate_flip_random_bits_of_random_byte(res: bytearray) -> bool:
+    if len(res) < 1:
         return False
     pos = _rand(len(res))
     res[pos] ^= _rand(255) + 1
     return True
 
 
-def _mutate_swap_2_bytes(res: bytearray) -> bool:
-    if len(res) <= 1:
+def _mutate_swap_two_bytes(res: bytearray) -> bool:
+    if len(res) < 2:
         return False
-    src = dst = _rand(len(res))
-    while src == dst:
-        dst = _rand(len(res))
+    src = _rand(len(res))
+    dst = _rand(len(res))
     res[src], res[dst] = res[dst], res[src]
     return True
 
 
 def _mutate_add_subtract_from_a_byte(res: bytearray) -> bool:
-    if len(res) == 0:
+    if len(res) < 1:
         return False
     pos = _rand(len(res))
     v_int = _rand(2**8)
@@ -187,7 +162,7 @@ def _mutate_add_subtract_from_a_uint64(res: bytearray) -> bool:
 
 
 def _mutate_replace_a_byte_with_an_interesting_value(res: bytearray) -> bool:
-    if len(res) == 0:
+    if len(res) < 1:
         return False
     pos = _rand(len(res))
     res[pos] = INTERESTING8[_rand(len(INTERESTING8))] % 256
@@ -305,8 +280,8 @@ class Corpus:
                     _mutate_replace_an_ascii_digit_with_another_digit,
                     _mutate_replace_an_uint16_with_an_interesting_value,
                     _mutate_replace_an_uint32_with_an_interesting_value,
-                    _mutate_set_byte_to_random_value,
-                    _mutate_swap_2_bytes,
+                    _mutate_flip_random_bits_of_random_byte,
+                    _mutate_swap_two_bytes,
                     _mutate_remove_range_of_bytes,
                 ],
             )

@@ -1,5 +1,43 @@
+from __future__ import annotations
+
+from typing import Optional
+
+
 class OutOfBoundsError(Exception):
     pass
+
+
+def copy(
+    data: bytearray,
+    source: int,
+    dest: int,
+    length: Optional[int] = None,
+) -> None:
+    """
+    Copy bytes from source to destination array.
+
+    Arguments:
+    ---------
+    data: Source array.
+    source: Start offset in source array.
+    dest: Start offset in destination array.
+    length: Number of bytes to copy (default: all source offset to end)
+    """
+    length = len(data) - source if length is None else length
+
+    if source >= len(data):
+        raise OutOfBoundsError(f"Source out of range ({source=}, length={len(data)})")
+    if source + length > len(data):
+        raise OutOfBoundsError(
+            f"Source end out of range (end={source + length - 1}, length={len(data)})",
+        )
+    if dest >= len(data):
+        raise OutOfBoundsError(f"Destination out of range ({dest=}, length={len(data)})")
+    if dest + length > len(data):
+        raise OutOfBoundsError(
+            f"Destination end out of range (end={dest + length - 1}, length={len(data)})",
+        )
+    data[dest : dest + length] = data[source : source + length]
 
 
 def remove(data: bytearray, start: int, length: int) -> None:
