@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import secrets
 from pathlib import Path
 
 import numpy as np
+import pytest
 from scipy.stats import chisquare
 
 from cobrafuzz import corpus
@@ -33,7 +35,11 @@ def test_add_files_constructor(tmpdir: Path) -> None:
         f.write(b"deadc0de")
 
     c = corpus.Corpus(dirs=[basedir])
-    assert c._inputs == [bytearray(b"deadc0de"), bytearray(b"deadbeef"), bytearray(0)]  # noqa: SLF001
+    assert c._inputs == [  # noqa: SLF001
+        bytearray(b"deadc0de"),
+        bytearray(b"deadbeef"),
+        bytearray(0),
+    ]
 
 
 def test_create_dir_constructor(tmpdir: Path) -> None:
@@ -118,3 +124,55 @@ def test_put_corpus_saved(tmpdir: Path) -> None:
     assert outfile.exists()
     with outfile.open("rb") as of:
         assert of.read() == b"deadbeef"
+
+
+def test_mutate_remove_range_of_bytes_fail() -> None:
+    res = bytearray()
+    assert not corpus._mutate_remove_range_of_bytes(res)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("data", "start", "length", "expected"),
+    [
+        (b"0123456789", 0, 1, b"123456789"),
+    ],
+)
+def test_mutate_remove_range_of_bytes_success(
+    monkeypatch: pytest.MonkeyPatch,
+    data: bytes,
+    start: int,
+    length: int,
+    expected: bytes,
+) -> None:
+    tmp = bytearray(data)
+
+    with monkeypatch.context() as mp:
+        mp.setattr(corpus, "_rand", lambda _: start)
+        mp.setattr(corpus, "_choose_len", lambda _: length)
+        assert corpus._mutate_remove_range_of_bytes(tmp)  # noqa: SLF001
+        assert tmp == expected
+
+
+@pytest.mark.parametrize(
+    ("data", "start", "length", "expected"),
+    [
+        (b"0123456789", 0, 5, b"XXXXX0123456789"),
+        (b"0123456789", 10, 5, b"0123456789XXXXX"),
+        (b"0123456789", 5, 5, b"01234XXXXX56789"),
+    ],
+)
+def test_mutate_insert_range_of_bytes_success(
+    monkeypatch: pytest.MonkeyPatch,
+    data: bytes,
+    start: int,
+    length: int,
+    expected: bytes,
+) -> None:
+    tmp = bytearray(data)
+
+    with monkeypatch.context() as mp:
+        mp.setattr(secrets, "token_bytes", lambda n: n * b"X")
+        mp.setattr(corpus, "_rand", lambda _: start)
+        mp.setattr(corpus, "_choose_len", lambda _: length)
+        assert corpus._mutate_insert_range_of_bytes(tmp)  # noqa: SLF001
+        assert tmp == expected

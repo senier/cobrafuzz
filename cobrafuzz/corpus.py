@@ -3,12 +3,13 @@ from __future__ import annotations
 import hashlib
 import os
 import random
+import secrets
 import struct
 from pathlib import Path
 from secrets import randbelow
 from typing import Optional
 
-from . import dictionary
+from . import dictionary, util
 
 INTERESTING8 = [-128, -1, 0, 1, 16, 32, 64, 100, 127]
 INTERESTING16 = [0, 128, 255, 256, 512, 1000, 1024, 4096, 32767, 65535]
@@ -67,21 +68,15 @@ def _choose_len(n: int) -> int:
 def _mutate_remove_range_of_bytes(res: bytearray) -> bool:
     if len(res) <= 1:
         return False
-    pos0 = _rand(len(res))
-    pos1 = pos0 + _choose_len(len(res) - pos0)
-    copy(res, res, pos1, pos0)
-    res = res[: len(res) - (pos1 - pos0)]
+    start = _rand(len(res))
+    util.remove(data=res, start=start, length=_choose_len(len(res) - start))
     return True
 
 
 def _mutate_insert_range_of_bytes(res: bytearray) -> bool:
-    pos = _rand(len(res) + 1)
-    n = _choose_len(10)
-    for _ in range(n):
-        res.append(0)
-    copy(res, res, pos, pos + n)
-    for k in range(n):
-        res[pos + k] = _rand(256)
+    # TODO(senier): Make magic number 10 configurable.
+    data = secrets.token_bytes(_choose_len(10))
+    util.insert(data=res, start=_rand(len(res) + 1), data_to_insert=data)
     return True
 
 
@@ -288,12 +283,12 @@ class Corpus:
                 self._seed_run_finished = True
             return next_input
 
-        buf = self._inputs[self._rand(len(self._inputs))]
+        buf = self._inputs[_rand(len(self._inputs))]
         return self.mutate(buf)
 
     def mutate(self, buf: bytearray) -> bytearray:
         res = buf[:]
-        nm = self._rand_exp()
+        nm = _rand_exp()
         i = 0
         while i != nm:
             modify = random.choice(  # noqa: S311
