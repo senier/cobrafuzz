@@ -9,7 +9,7 @@ def test_remove() -> None:
     pos0 = 4
     pos1 = 5
 
-    corpus.Corpus.copy(res, res, pos1, pos0)
+    corpus.copy(res, res, pos1, pos0)
 
     res = res[: len(res) - (pos1 - pos0)]
     assert res == b"abcdfg"
@@ -25,7 +25,7 @@ def test_insert() -> None:
     for _ in range(n):
         res.append(0)
 
-    corpus.Corpus.copy(res, res, pos, pos + n)
+    corpus.copy(res, res, pos, pos + n)
 
     for k in range(n):
         res[pos + k] = ord("Z")
@@ -43,12 +43,12 @@ def test_duplicate() -> None:
     n = 2
 
     tmp = bytearray(n)
-    corpus.Corpus.copy(res, tmp, src, 0)
+    corpus.copy(res, tmp, src, 0)
     assert tmp == b"ef"
 
     for _ in range(n):
         res.append(0)
-    corpus.Corpus.copy(res, res, dst, dst + n)
+    corpus.copy(res, res, dst, dst + n)
     for k in range(n):
         res[dst + k] = tmp[k]
     assert res == b"abcdeeffg"
@@ -63,5 +63,5 @@ def test_copy() -> None:
     dst = 5
     n = 2
 
-    corpus.Corpus.copy(res, res, src, dst, src + n)
+    corpus.copy(res, res, src, dst, src + n)
     assert res == b"abcdeef"
