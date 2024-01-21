@@ -4,6 +4,21 @@ from cobrafuzz import util
 
 
 @pytest.mark.parametrize(
+    ("data", "source", "dest", "length", "expected"),
+    [
+        (b"0123456789", 0, 3, 3, b"0120126789"),
+        (b"0123456789", 5, 0, 5, b"5678956789"),
+        (b"0123456789", 4, 0, 6, b"4567896789"),
+        (b"0123456789", 4, 4, 0, b"0123456789"),
+    ],
+)
+def test_copy_valid(data: bytes, source: int, dest: int, length: int, expected: bytes) -> None:
+    tmp = bytearray(data)
+    util.copy(tmp, source, dest, length)
+    assert tmp == bytearray(expected)
+
+
+@pytest.mark.parametrize(
     ("data", "start", "length", "error"),
     [
         (b"", 1, 2, r"^Start out of range \(start=1, length=0\)$"),

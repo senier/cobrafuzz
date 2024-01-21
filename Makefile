@@ -19,7 +19,7 @@ check_kacl: .devel_installed
 test: test_unit test_integration test_build
 
 test_unit: .devel_installed
-	PYTHONPATH=. pytest -vv --cov-report term:skip-covered --cov-report xml:coverage.xml --cov=cobrafuzz --cov=tests.unit --cov-branch --cov-fail-under=48 tests/unit
+	PYTHONPATH=. pytest -vv --cov-report term:skip-covered --cov-report xml:coverage.xml --cov=cobrafuzz --cov=tests.unit --cov-branch --cov-fail-under=60 tests/unit
 
 test_integration: .devel_installed
 	PYTHONPATH=. pytest -vv tests/integration
