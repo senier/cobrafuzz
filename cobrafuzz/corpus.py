@@ -11,9 +11,10 @@ from typing import Optional
 
 from . import dictionary, util
 
-INTERESTING8 = [-128, -1, 0, 1, 16, 32, 64, 100, 127]
+INTERESTING8 = [0, 1, 16, 32, 64, 100, 127, 128, 129, 255]
 INTERESTING16 = [0, 128, 255, 256, 512, 1000, 1024, 4096, 32767, 65535]
 INTERESTING32 = [0, 1, 32768, 65535, 65536, 100663045, 2147483647, 4294967295]
+DIGITS = {ord(i) for i in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")}
 
 
 def _rand(n: int) -> int:
@@ -126,8 +127,9 @@ def _mutate_add_subtract_from_a_uint16(res: bytearray) -> bool:
     pos = _rand(len(res) - 1)
     v_int = _rand(2**16)
     v = struct.pack(">H", v_int) if bool(random.getrandbits(1)) else struct.pack("<H", v_int)
+    # TODO(senier): Implement version performing 16-bit addition
     res[pos] = (res[pos] + v[0]) % 256
-    res[pos + 1] = (res[pos] + v[1]) % 256
+    res[pos + 1] = (res[pos + 1] + v[1]) % 256
     return True
 
 
@@ -165,7 +167,7 @@ def _mutate_replace_a_byte_with_an_interesting_value(res: bytearray) -> bool:
     if len(res) < 1:
         return False
     pos = _rand(len(res))
-    res[pos] = INTERESTING8[_rand(len(INTERESTING8))] % 256
+    res[pos] = random.choice(INTERESTING8)  # noqa: S311
     return True
 
 
@@ -194,16 +196,12 @@ def _mutate_replace_an_uint32_with_an_interesting_value(res: bytearray) -> bool:
 
 
 def _mutate_replace_an_ascii_digit_with_another_digit(res: bytearray) -> bool:
-    digits = [k for k in range(len(res)) if ord("0") <= res[k] <= ord("9")]
-    if len(digits) == 0:
+    digits_present = [(i, res[i]) for i in range(len(res)) if ord("0") <= res[i] <= ord("9")]
+    if len(digits_present) < 1:
         return False
-    pos = _rand(len(digits))
-    was = res[digits[pos]]
-    now = was
-    while was == now:
-        now = _rand(10) + ord("0")
-    res[digits[pos]] = now
-    return False
+    pos, old = random.choice(digits_present)  # noqa: S311
+    res[pos] = random.choice(list(DIGITS - {old}))  # noqa: S311
+    return True
 
 
 class Corpus:
@@ -264,8 +262,7 @@ class Corpus:
     def mutate(self, buf: bytearray) -> bytearray:
         res = buf[:]
         nm = _rand_exp()
-        i = 0
-        while i != nm:
+        while nm:
             modify = random.choice(  # noqa: S311
                 [
                     _mutate_insert_range_of_bytes,
@@ -286,7 +283,7 @@ class Corpus:
                 ],
             )
             if modify(res):
-                i += 1
+                nm -= 1
 
         if len(res) > self._max_input_size:
             res = res[: self._max_input_size]
