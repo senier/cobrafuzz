@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import random
 import secrets
 from pathlib import Path
 
@@ -124,6 +125,51 @@ def test_put_corpus_saved(tmpdir: Path) -> None:
     assert outfile.exists()
     with outfile.open("rb") as of:
         assert of.read() == b"deadbeef"
+
+
+def test_generate_input(tmpdir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    filename = Path(tmpdir) / "input.dat"
+    with filename.open("wb") as f:
+        f.write(b"deadbeef")
+    c = corpus.Corpus(dirs=[filename])
+    with monkeypatch.context() as mp:
+        mp.setattr(c, "mutate", lambda v: v)
+        mp.setattr(corpus, "_rand", lambda _: 0)
+        assert c.generate_input() == bytearray(b"deadbeef")
+        assert c.generate_input() == bytearray(0)
+        assert c.generate_input() == bytearray(b"deadbeef")
+
+
+def test_mutate(monkeypatch: pytest.MonkeyPatch) -> None:
+    c = corpus.Corpus()
+    with monkeypatch.context() as mp:
+        mp.setattr(corpus, "_rand_exp", lambda: 2)
+        mp.setattr(corpus, "_rand", lambda _: 5)
+        mp.setattr(secrets, "token_bytes", lambda _: bytearray(b"inserted"))
+        mp.setattr(random, "choice", lambda _: corpus._mutate_insert_range_of_bytes)  # noqa: SLF001
+        assert c.mutate(bytearray(b"0123456789")) == bytearray(b"01234insertedinserted56789")
+
+
+def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
+    def modify(res: bytearray) -> bool:
+        if res[0] != 0:
+            res[0] = 0
+            return False
+        return True
+
+    c = corpus.Corpus()
+    with monkeypatch.context() as mp:
+        mp.setattr(corpus, "_rand_exp", lambda: 2)
+        mp.setattr(random, "choice", lambda _: modify)
+        assert c.mutate(bytearray(b"0123456789")) == bytearray(b"\x00123456789")
+
+
+def test_mutate_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
+    c = corpus.Corpus(max_input_size=4)
+    with monkeypatch.context() as mp:
+        mp.setattr(corpus, "_rand_exp", lambda: 1)
+        mp.setattr(random, "choice", lambda _: lambda x: x)
+        assert c.mutate(bytearray(b"0123456789")) == bytearray(b"0123")
 
 
 def test_mutate_remove_range_of_bytes_fail() -> None:
@@ -370,7 +416,7 @@ def test_mutate_swap_two_bytes(
 
 def test_mutate_add_subtract_from_a_byte_fail() -> None:
     data = bytearray(b"")
-    assert not corpus._mutate_swap_two_bytes(data)  # noqa: SLF001
+    assert not corpus._mutate_add_subtract_from_a_byte(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -400,4 +446,237 @@ def test_mutate_add_subtract_from_a_byte_success(
     with monkeypatch.context() as mp:
         mp.setattr(corpus, "_rand", lambda n: value if n == 2**8 else position)
         assert corpus._mutate_add_subtract_from_a_byte(tmp)  # noqa: SLF001
+        assert tmp == expected
+
+
+def test_mutate_add_subtract_from_a_uint16_fail() -> None:
+    data = bytearray(b"")
+    assert not corpus._mutate_add_subtract_from_a_uint16(data)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("data", "position", "value", "little_endian", "expected"),
+    [
+        (b"0123456789", 0, 0x0102, False, b"1323456789"),
+        (b"0123456789", 0, 0x0102, True, b"2223456789"),
+        (b"0123456789", 8, 0x0102, False, b"012345679;"),
+        (b"0123456789", 8, 0x0102, True, b"01234567::"),
+    ],
+)
+def test_mutate_add_subtract_from_a_uint16_success(
+    monkeypatch: pytest.MonkeyPatch,
+    data: bytes,
+    position: int,
+    value: int,
+    little_endian: bool,
+    expected: bytes,
+) -> None:
+    tmp = bytearray(data)
+
+    # This would confuse our mocked _rand function below
+    assert len(data) != 2**16, "data length must not be 2**16 in this test"
+
+    with monkeypatch.context() as mp:
+        mp.setattr(corpus, "_rand", lambda n: value if n == 2**16 else position)
+        mp.setattr(random, "getrandbits", lambda _: 0 if little_endian else 1)
+        assert corpus._mutate_add_subtract_from_a_uint16(tmp)  # noqa: SLF001
+        assert tmp == expected
+
+
+def test_mutate_add_subtract_from_a_uint32_fail() -> None:
+    data = bytearray(b"")
+    assert not corpus._mutate_add_subtract_from_a_uint32(data)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("data", "position", "value", "little_endian", "expected"),
+    [
+        (b"0123456789", 0, 0x01020304, False, b"1357456789"),
+        (b"0123456789", 0, 0x01020304, True, b"4444456789"),
+        (b"0123456789", 6, 0x01020304, False, b"01234579;="),
+        (b"0123456789", 6, 0x01020304, True, b"012345::::"),
+    ],
+)
+def test_mutate_add_subtract_from_a_uint32_success(
+    monkeypatch: pytest.MonkeyPatch,
+    data: bytes,
+    position: int,
+    value: int,
+    little_endian: bool,
+    expected: bytes,
+) -> None:
+    tmp = bytearray(data)
+
+    # This would confuse our mocked _rand function below
+    assert len(data) != 2**32, "data length must not be 2**32 in this test"
+
+    with monkeypatch.context() as mp:
+        mp.setattr(corpus, "_rand", lambda n: value if n == 2**32 else position)
+        mp.setattr(random, "getrandbits", lambda _: 0 if little_endian else 1)
+        assert corpus._mutate_add_subtract_from_a_uint32(tmp)  # noqa: SLF001
+        assert tmp == expected
+
+
+def test_mutate_add_subtract_from_a_uint64_fail() -> None:
+    data = bytearray(b"")
+    assert not corpus._mutate_add_subtract_from_a_uint64(data)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("data", "position", "value", "little_endian", "expected"),
+    [
+        (b"0123456789", 0, 0x0102030405060708, False, b"13579;=?89"),
+        (b"0123456789", 0, 0x0102030405060708, True, b"8888888889"),
+        (b"0123456789", 2, 0x0102030405060708, False, b"013579;=?A"),
+        (b"0123456789", 2, 0x0102030405060708, True, b"01::::::::"),
+    ],
+)
+def test_mutate_add_subtract_from_a_uint64_success(
+    monkeypatch: pytest.MonkeyPatch,
+    data: bytes,
+    position: int,
+    value: int,
+    little_endian: bool,
+    expected: bytes,
+) -> None:
+    tmp = bytearray(data)
+
+    # This would confuse our mocked _rand function below
+    assert len(data) != 2**64, "data length must not be 2**64 in this test"
+
+    with monkeypatch.context() as mp:
+        mp.setattr(corpus, "_rand", lambda n: value if n == 2**64 else position)
+        mp.setattr(random, "getrandbits", lambda _: 0 if little_endian else 1)
+        assert corpus._mutate_add_subtract_from_a_uint64(tmp)  # noqa: SLF001
+        assert tmp == expected
+
+
+def test_mutate_replace_a_byte_with_an_interesting_value_fail() -> None:
+    data = bytearray(b"")
+    assert not corpus._mutate_replace_a_byte_with_an_interesting_value(data)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("data", "position", "value", "expected"),
+    [
+        (b"0123456789", 0, 1, b"\x01123456789"),
+        (b"0123456789", 0, 255, b"\xff123456789"),
+        (b"0123456789", 5, 2, b"01234\x026789"),
+        (b"0123456789", 5, 254, b"01234\xfe6789"),
+        (b"0123456789", 9, 3, b"012345678\x03"),
+        (b"0123456789", 9, 253, b"012345678\xfd"),
+    ],
+)
+def test_mutate_replace_a_byte_with_an_interesting_value_success(
+    monkeypatch: pytest.MonkeyPatch,
+    data: bytes,
+    position: int,
+    value: int,
+    expected: bytes,
+) -> None:
+    tmp = bytearray(data)
+
+    with monkeypatch.context() as mp:
+        mp.setattr(corpus, "_rand", lambda _: position)
+        mp.setattr(corpus, "INTERESTING8", [value])
+        assert corpus._mutate_replace_a_byte_with_an_interesting_value(tmp)  # noqa: SLF001
+        assert tmp == expected
+
+
+def test_mutate_replace_an_uint16_with_an_interesting_value_fail() -> None:
+    data = bytearray(b"")
+    assert not corpus._mutate_replace_an_uint16_with_an_interesting_value(data)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("data", "position", "value", "little_endian", "expected"),
+    [
+        (b"0123456789", 0, 0x0102, False, b"\x01\x0223456789"),
+        (b"0123456789", 0, 0x0102, True, b"\x02\x0123456789"),
+        (b"0123456789", 5, 0x0102, False, b"01234\x01\x02789"),
+        (b"0123456789", 5, 0x0102, True, b"01234\x02\x01789"),
+        (b"0123456789", 8, 0x0102, False, b"01234567\x01\x02"),
+        (b"0123456789", 8, 0x0102, True, b"01234567\x02\x01"),
+    ],
+)
+def test_mutate_replace_an_uint16_with_an_interesting_value_success(
+    monkeypatch: pytest.MonkeyPatch,
+    data: bytes,
+    position: int,
+    value: int,
+    little_endian: bool,
+    expected: bytes,
+) -> None:
+    tmp = bytearray(data)
+
+    with monkeypatch.context() as mp:
+        mp.setattr(corpus, "_rand", lambda _: position)
+        mp.setattr(corpus, "INTERESTING16", [value])
+        mp.setattr(random, "getrandbits", lambda _: 0 if little_endian else 1)
+        assert corpus._mutate_replace_an_uint16_with_an_interesting_value(tmp)  # noqa: SLF001
+        assert tmp == expected
+
+
+def test_mutate_replace_an_uint32_with_an_interesting_value_fail() -> None:
+    data = bytearray(b"")
+    assert not corpus._mutate_replace_an_uint32_with_an_interesting_value(data)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("data", "position", "value", "little_endian", "expected"),
+    [
+        (b"0123456789", 0, 0x01020304, False, b"\x01\x02\x03\x04456789"),
+        (b"0123456789", 0, 0x01020304, True, b"\x04\x03\x02\x01456789"),
+        (b"0123456789", 5, 0x01020304, False, b"01234\x01\x02\x03\x049"),
+        (b"0123456789", 5, 0x01020304, True, b"01234\x04\x03\x02\x019"),
+        (b"0123456789", 6, 0x01020304, False, b"012345\x01\x02\x03\x04"),
+        (b"0123456789", 6, 0x01020304, True, b"012345\x04\x03\x02\x01"),
+    ],
+)
+def test_mutate_replace_an_uint32_with_an_interesting_value_success(
+    monkeypatch: pytest.MonkeyPatch,
+    data: bytes,
+    position: int,
+    value: int,
+    little_endian: bool,
+    expected: bytes,
+) -> None:
+    tmp = bytearray(data)
+
+    with monkeypatch.context() as mp:
+        mp.setattr(corpus, "_rand", lambda _: position)
+        mp.setattr(corpus, "INTERESTING32", [value])
+        mp.setattr(random, "getrandbits", lambda _: 0 if little_endian else 1)
+        assert corpus._mutate_replace_an_uint32_with_an_interesting_value(tmp)  # noqa: SLF001
+        assert tmp == expected
+
+
+def test_mutate_replace_an_ascii_digit_with_another_digit_fail() -> None:
+    data = bytearray(b"no digits present")
+    assert not corpus._mutate_replace_an_ascii_digit_with_another_digit(data)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("data", "position", "value", "expected"),
+    [
+        (b"0123456789", 0, 4, b"4123456789"),
+        (b"0123456789", 0, 5, b"5123456789"),
+        (b"0123456789", 5, 4, b"0123446789"),
+        (b"0123456789", 9, 4, b"0123456784"),
+        (b"0123456789", 9, 5, b"0123456785"),
+    ],
+)
+def test_mutate_replace_an_ascii_digit_with_another_digit_success(
+    monkeypatch: pytest.MonkeyPatch,
+    data: bytes,
+    position: int,
+    value: int,
+    expected: bytes,
+) -> None:
+    tmp = bytearray(data)
+
+    with monkeypatch.context() as mp:
+        mp.setattr(random, "choice", lambda d: (position, tmp[position]) if len(d) > 1 else d[0])
+        mp.setattr(corpus, "DIGITS", {ord("0") + value})
+        assert corpus._mutate_replace_an_ascii_digit_with_another_digit(tmp)  # noqa: SLF001
         assert tmp == expected
