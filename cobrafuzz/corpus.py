@@ -9,7 +9,7 @@ from pathlib import Path
 from secrets import randbelow
 from typing import Optional
 
-from . import dictionary, util
+from . import util
 
 INTERESTING8 = [0, 1, 16, 32, 64, 100, 127, 128, 129, 255]
 INTERESTING16 = [0, 128, 255, 256, 512, 1000, 1024, 4096, 32767, 65535]
@@ -28,7 +28,7 @@ def _rand_exp() -> int:
     rand_bin = bin(random.randint(0, 2**32 - 1))[2:]  # noqa: S311
     rand_bin = "0" * (32 - len(rand_bin)) + rand_bin
     count = 0
-    for i in rand_bin:
+    for i in rand_bin:  # pragma: no cover
         if i == "0":
             count += 1
         else:
@@ -209,10 +209,8 @@ class Corpus:
         self,
         dirs: Optional[list[Path]] = None,
         max_input_size: int = 4096,
-        dict_path: Optional[Path] = None,
     ):
         self._inputs: list[bytearray] = []
-        self._dict = dictionary.Dictionary(dict_path)
         self._max_input_size = max_input_size
         self._dirs = dirs if dirs else []
         for i, path in enumerate(self._dirs):

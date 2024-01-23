@@ -67,7 +67,6 @@ class Fuzzer:
         max_input_size: int = 4096,
         close_fd_mask: int = 0,
         runs: int = -1,
-        dict_path: Optional[Path] = None,
     ):
         self._target = target
         self._dirs = [] if dirs is None else dirs
@@ -76,7 +75,7 @@ class Fuzzer:
         self._timeout = timeout
         self._regression = regression
         self._close_fd_mask = close_fd_mask
-        self._corpus = corpus.Corpus(self._dirs, max_input_size, dict_path)
+        self._corpus = corpus.Corpus(self._dirs, max_input_size)
         self._total_executions = 0
         self._executions_in_sample = 0
         self._last_sample_time = time.time()
