@@ -4,6 +4,21 @@ from cobrafuzz import util
 
 
 @pytest.mark.parametrize(
+    ("data", "source", "dest", "length", "error"),
+    [
+        (b"0123456789", 20, 3, 3, r"Source out of range \(source=20, length=10\)"),
+        (b"0123456789", 5, 0, 20, r"Source end out of range \(end=24, length=10\)"),
+        (b"0123456789", 4, 20, 3, r"Destination out of range \(dest=20, length=10\)"),
+        (b"0123456789", 4, 9, 5, r"Destination end out of range \(end=13, length=10\)"),
+    ],
+)
+def test_copy_invalid(data: bytes, source: int, dest: int, length: int, error: str) -> None:
+    tmp = bytearray(data)
+    with pytest.raises(util.OutOfBoundsError, match=rf"^{error}$"):
+        util.copy(tmp, source, dest, length)
+
+
+@pytest.mark.parametrize(
     ("data", "source", "dest", "length", "expected"),
     [
         (b"0123456789", 0, 3, 3, b"0120126789"),
