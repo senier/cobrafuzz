@@ -36,11 +36,13 @@ def test_add_files_constructor(tmpdir: Path) -> None:
         f.write(b"deadc0de")
 
     c = corpus.Corpus(dirs=[basedir])
-    assert c._inputs == [  # noqa: SLF001
-        bytearray(b"deadc0de"),
-        bytearray(b"deadbeef"),
-        bytearray(0),
-    ]
+    assert sorted(c._inputs) == sorted(  # noqa: SLF001
+        [
+            bytearray(b"deadc0de"),
+            bytearray(b"deadbeef"),
+            bytearray(0),
+        ],
+    )
 
 
 def test_create_dir_constructor(tmpdir: Path) -> None:
@@ -72,13 +74,13 @@ def test_rand_exponential() -> None:
     # There should be more than 13 samples in each bin,
     # c.f. https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.chisquare.html
     # Starting at the position *before* the element that is <= 13, bin all remaining elements.
-    index = (
-        min(
-            next(i for i, v in enumerate(data) if v < 13),
-            next(i for i, v in enumerate(expected) if v < 13),
-        )
-        - 1
-    )
+    data_valid_samples = [i for i, v in enumerate(data) if v < 13]
+    assert len(data_valid_samples) > 0
+
+    expected_valid_samples = [i for i, v in enumerate(expected) if v < 13]
+    assert len(expected_valid_samples) > 0
+
+    index = min(data_valid_samples[0], expected_valid_samples[0]) - 1
     data = data[:index] + [sum(data[index:])]
     expected = expected[:index] + [sum(expected[index:])]
 
