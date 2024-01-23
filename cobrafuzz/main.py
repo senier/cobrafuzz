@@ -37,7 +37,6 @@ class CobraFuzz:
             default=4096,
             help="Max input size in bytes",
         )
-        parser.add_argument("--dict", type=str, help="dictionary file")
         parser.add_argument(
             "--close-fd-mask",
             type=int,
@@ -67,6 +66,5 @@ class CobraFuzz:
             args.max_input_size,
             args.close_fd_mask,
             args.runs,
-            args.dict,
         )
         f.start()
