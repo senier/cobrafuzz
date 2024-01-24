@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import collections
+import sys
 from types import FrameType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from _typeshed import TraceFunction
@@ -9,10 +12,22 @@ prev_line = 0
 prev_filename = ""
 data = collections.defaultdict(set)
 
+_secondary_tracer: Optional[TraceFunction] = None
 
-def trace(frame: FrameType, event: str, _: str) -> "TraceFunction":
+
+def initialize() -> None:
+    global _secondary_tracer  # noqa: PLW0603
+    _secondary_tracer = sys.gettrace()
+    sys.settrace(_trace_dispatcher)
+
+
+def get_coverage() -> int:
+    return sum(map(len, data.values()))
+
+
+def _primary_tracer(frame: FrameType, event: str, _: str) -> None:
     if event != "line":
-        return trace
+        return
 
     global prev_line  # noqa: PLW0603
     global prev_filename  # noqa: PLW0603
@@ -31,8 +46,10 @@ def trace(frame: FrameType, event: str, _: str) -> "TraceFunction":
     prev_line = func_line_no
     prev_filename = func_filename
 
-    return trace
 
+def _trace_dispatcher(frame: FrameType, event: str, args: str) -> TraceFunction:
+    _primary_tracer(frame, event, args)
+    if _secondary_tracer:
+        _secondary_tracer(frame, event, args)
 
-def get_coverage() -> int:
-    return sum(map(len, data.values()))
+    return _trace_dispatcher
