@@ -42,7 +42,7 @@ def worker(
     if close_fd_mask & 2:
         sys.stderr = DummyFile()
 
-    sys.settrace(tracer.trace)
+    tracer.initialize()
     while True:
         buf = child_conn.recv_bytes()
         try:
