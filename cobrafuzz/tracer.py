@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 prev_line = 0
 prev_filename = ""
-data = collections.defaultdict(set)
+data: collections.defaultdict[str, set[tuple[int, int]]] = collections.defaultdict(set)
 
 _secondary_tracer: Optional[TraceFunction] = None
 
