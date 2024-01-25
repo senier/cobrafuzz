@@ -1,5 +1,6 @@
 import importlib
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -20,9 +21,13 @@ import pytest
         "zlib",
     ],
 )
-def test_example(monkeypatch: pytest.MonkeyPatch, test: str) -> None:
+def test_example(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    test: str,
+) -> None:
     with monkeypatch.context() as mp:
-        mp.setattr(sys, "argv", ["fuzz", "--runs", "100"])
+        mp.setattr(sys, "argv", ["fuzz", "--crash-dir", str(tmp_path), "--runs", "100"])
         fuzz = importlib.import_module(f"examples.{test}.fuzz")
         with pytest.raises(SystemExit, match="^0$"):
             fuzz.fuzz()
