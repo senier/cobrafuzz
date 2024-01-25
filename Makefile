@@ -19,7 +19,7 @@ check_kacl: .devel_installed
 test: test_unit test_integration test_build
 
 test_unit: .devel_installed
-	PYTHONPATH=. pytest -vv --cov-report term:skip-covered --cov-report xml:coverage.xml --cov=cobrafuzz --cov=tests.unit --cov-branch --cov-fail-under=70 tests/unit
+	PYTHONPATH=. pytest -vv --cov-report term:skip-covered --cov-report xml:coverage.xml --cov=cobrafuzz --cov=tests.unit --cov-branch --cov-fail-under=100 tests/unit
 
 test_integration: .devel_installed
 	PYTHONPATH=. pytest -vv tests/integration
@@ -39,6 +39,6 @@ format:
 	black $(PYTHON_PACKAGES)
 
 clean:
-	rm -rf dist cobrafuzz.egg-info crashes .devel_installed .ruff_cache build .venv
+	rm -rf dist cobrafuzz.egg-info crashes .devel_installed .ruff_cache build
 
 .PHONY: check check_black check_kacl check_mypy check_ruff test test_build test_integration test_unit install_devel

@@ -8,10 +8,9 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from _typeshed import TraceFunction
 
-prev_line = 0
-prev_filename = ""
-data: collections.defaultdict[str, set[tuple[int, int]]] = collections.defaultdict(set)
-
+_prev_line = 0
+_prev_filename = ""
+_data: collections.defaultdict[str, set[tuple[int, int]]] = collections.defaultdict(set)
 _secondary_tracer: Optional[TraceFunction] = None
 
 
@@ -22,34 +21,34 @@ def initialize() -> None:
 
 
 def get_coverage() -> int:
-    return sum(map(len, data.values()))
+    return sum(map(len, _data.values()))
 
 
-def _primary_tracer(frame: FrameType, event: str, _: str) -> None:
+def _primary_tracer(frame: FrameType, event: str, _args: str) -> None:
     if event != "line":
         return
 
-    global prev_line  # noqa: PLW0603
-    global prev_filename  # noqa: PLW0603
+    global _prev_line  # noqa: PLW0603
+    global _prev_filename  # noqa: PLW0603
 
     func_filename = frame.f_code.co_filename
     func_line_no = frame.f_lineno
 
-    if func_filename != prev_filename:
+    if func_filename != _prev_filename:
         # We need a way to keep track of inter-files transfers,
         # and since we don't really care about the details of the coverage,
         # concatenating the two filenames in enough.
-        data[func_filename + prev_filename].add((prev_line, func_line_no))
+        _data[func_filename + _prev_filename].add((_prev_line, func_line_no))
     else:
-        data[func_filename].add((prev_line, func_line_no))
+        _data[func_filename].add((_prev_line, func_line_no))
 
-    prev_line = func_line_no
-    prev_filename = func_filename
+    _prev_line = func_line_no
+    _prev_filename = func_filename
 
 
 def _trace_dispatcher(frame: FrameType, event: str, args: str) -> TraceFunction:
     _primary_tracer(frame, event, args)
     if _secondary_tracer:
-        _secondary_tracer(frame, event, args)
+        _secondary_tracer(frame, event, args)  # pragma: no cover
 
     return _trace_dispatcher
