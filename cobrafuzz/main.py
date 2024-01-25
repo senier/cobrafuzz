@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 from typing import Callable
 
 from cobrafuzz import fuzzer
@@ -12,7 +13,7 @@ class CobraFuzz:
         parser = argparse.ArgumentParser(description="Coverage-guided fuzzer for python packages")
         parser.add_argument(
             "dirs",
-            type=str,
+            type=Path,
             nargs="*",
             help=(
                 "one or more directories/files to use as seed corpus. "
@@ -20,7 +21,13 @@ class CobraFuzz:
             ),
         )
         parser.add_argument(
-            "--exact-artifact-path",
+            "--crash-dir",
+            type=Path,
+            required=True,
+            help="crash output directory",
+        )
+        parser.add_argument(
+            "--artifact-name",
             type=str,
             help="set exact artifact path for crashes/OOMs",
         )
@@ -57,14 +64,15 @@ class CobraFuzz:
         )
         args = parser.parse_args()
         f = fuzzer.Fuzzer(
-            self.function,
-            args.dirs,
-            args.exact_artifact_path,
-            args.rss_limit_mb,
-            args.timeout,
-            args.regression,
-            args.max_input_size,
-            args.close_fd_mask,
-            args.runs,
+            target=self.function,
+            crash_dir=args.crash_dir,
+            dirs=args.dirs,
+            artifact_name=args.artifact_name,
+            rss_limit_mb=args.rss_limit_mb,
+            timeout=args.timeout,
+            regression=args.regression,
+            max_input_size=args.max_input_size,
+            close_fd_mask=args.close_fd_mask,
+            runs=args.runs,
         )
         f.start()

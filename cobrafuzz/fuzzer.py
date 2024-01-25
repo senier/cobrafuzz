@@ -59,8 +59,9 @@ class Fuzzer:
     def __init__(  # noqa: PLR0913, ref:#2
         self,
         target: Callable[[bytes], None],
+        crash_dir: Path,
         dirs: Optional[list[Path]] = None,
-        exact_artifact_path: Optional[Path] = None,
+        artifact_name: Optional[str] = None,
         rss_limit_mb: int = 2048,
         timeout: int = 120,
         regression: bool = False,
@@ -69,8 +70,9 @@ class Fuzzer:
         runs: int = -1,
     ):
         self._target = target
+        self._crash_dir = crash_dir
         self._dirs = [] if dirs is None else dirs
-        self._exact_artifact_path = exact_artifact_path
+        self._artifact_name = artifact_name
         self._rss_limit_mb = rss_limit_mb
         self._timeout = timeout
         self._regression = regression
@@ -112,15 +114,13 @@ class Fuzzer:
     def write_sample(self, buf: bytes, prefix: str = "crash-") -> None:
         m = hashlib.sha256()
         m.update(buf)
-        if self._exact_artifact_path:
-            crash_path = self._exact_artifact_path
-        else:
-            dir_path = Path("crashes")
-            if not dir_path.exists():
-                dir_path.mkdir(parents=True)
-                logging.info("The crashes directory is created")
 
-            crash_path = dir_path / (prefix + m.hexdigest())
+        if not self._crash_dir.exists():
+            self._crash_dir.mkdir(parents=True)
+            logging.info("Crash dir created (%s)", self._crash_dir)
+
+        crash_path = self._crash_dir / (self._artifact_name or (prefix + m.hexdigest()))
+
         with crash_path.open("wb") as f:
             f.write(buf)
         logging.info("sample was written to %s", crash_path)
