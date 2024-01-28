@@ -204,19 +204,49 @@ def _mutate_replace_an_ascii_digit_with_another_digit(res: bytearray) -> bool:
     return True
 
 
+def mutate(buf: bytearray, max_input_size: Optional[int] = None) -> bytearray:
+    res = buf[:]
+    nm = _rand_exp()
+    while nm:
+        modify = random.choice(  # noqa: S311
+            [
+                _mutate_insert_range_of_bytes,
+                _mutate_add_subtract_from_a_byte,
+                _mutate_add_subtract_from_a_uint16,
+                _mutate_add_subtract_from_a_uint32,
+                _mutate_add_subtract_from_a_uint64,
+                _mutate_bit_flip,
+                _mutate_copy_range_of_bytes,
+                _mutate_duplicate_range_of_bytes,
+                _mutate_replace_a_byte_with_an_interesting_value,
+                _mutate_replace_an_ascii_digit_with_another_digit,
+                _mutate_replace_an_uint16_with_an_interesting_value,
+                _mutate_replace_an_uint32_with_an_interesting_value,
+                _mutate_flip_random_bits_of_random_byte,
+                _mutate_swap_two_bytes,
+                _mutate_remove_range_of_bytes,
+            ],
+        )
+        if modify(res):
+            nm -= 1
+
+    if max_input_size and len(res) > max_input_size:
+        res = res[:max_input_size]
+    return res
+
+
 class Corpus:
     def __init__(
         self,
-        dirs: Optional[list[Path]] = None,
+        seeds: Optional[list[Path]] = None,
         max_input_size: int = 4096,
+        save_dir: Optional[Path] = None,
     ):
         self._inputs: list[bytearray] = []
         self._max_input_size = max_input_size
-        self._dirs = dirs if dirs else []
-        for i, path in enumerate(self._dirs):
-            if i == 0 and not path.exists():
-                path.mkdir()
+        self._seeds = seeds or []
 
+        for path in self._seeds:
             if path.is_file():
                 self._add_file(path)
             else:
@@ -224,9 +254,13 @@ class Corpus:
                     fname = path / j
                     if fname.is_file():
                         self._add_file(fname)
+
         self._seed_run_finished = not self._inputs
         self._seed_idx = 0
-        self._save_corpus: bool = bool(self._dirs) and self._dirs[0].is_dir()
+
+        self._save_dir = save_dir
+        if self._save_dir and not self._save_dir.exists():
+            self._save_dir.mkdir()
 
         # TODO(senier): Why this additional 0 element?
         self._inputs.append(bytearray(0))
@@ -241,8 +275,8 @@ class Corpus:
 
     def put(self, buf: bytearray) -> None:
         self._inputs.append(buf)
-        if self._save_corpus:
-            fname = self._dirs[0] / hashlib.sha256(buf).hexdigest()
+        if self._save_dir:
+            fname = self._save_dir / hashlib.sha256(buf).hexdigest()
             with fname.open("wb") as f:
                 f.write(buf)
 
@@ -255,34 +289,4 @@ class Corpus:
             return next_input
 
         buf = self._inputs[_rand(len(self._inputs))]
-        return self.mutate(buf)
-
-    def mutate(self, buf: bytearray) -> bytearray:
-        res = buf[:]
-        nm = _rand_exp()
-        while nm:
-            modify = random.choice(  # noqa: S311
-                [
-                    _mutate_insert_range_of_bytes,
-                    _mutate_add_subtract_from_a_byte,
-                    _mutate_add_subtract_from_a_uint16,
-                    _mutate_add_subtract_from_a_uint32,
-                    _mutate_add_subtract_from_a_uint64,
-                    _mutate_bit_flip,
-                    _mutate_copy_range_of_bytes,
-                    _mutate_duplicate_range_of_bytes,
-                    _mutate_replace_a_byte_with_an_interesting_value,
-                    _mutate_replace_an_ascii_digit_with_another_digit,
-                    _mutate_replace_an_uint16_with_an_interesting_value,
-                    _mutate_replace_an_uint32_with_an_interesting_value,
-                    _mutate_flip_random_bits_of_random_byte,
-                    _mutate_swap_two_bytes,
-                    _mutate_remove_range_of_bytes,
-                ],
-            )
-            if modify(res):
-                nm -= 1
-
-        if len(res) > self._max_input_size:
-            res = res[: self._max_input_size]
-        return res
+        return mutate(buf, self._max_input_size)

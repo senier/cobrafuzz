@@ -10,10 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Support code coverage and fuzzing at the same time
+- Parallel fuzzing (#11)
+- Global timeout (#14)
+
+### Fixed
+
+- Regression mode
+- Prevent tracer from being replaced by secondary tracer
 
 ### Changed
 
+- Continue after error was found, make number of errors configurable (#12)
 - Make crash dir configurable (#13)
+- Use mp.get_context for multiprocessing (#1)
+- Use flags instead of file descriptor mask to close stdout and stderr
+- Make logging frequency configurable via --stat-frequency
+
+### Removed
+
+- Memory limit checking
+- Per-run timeout
 
 ## [1.0.12] - 2024-01-24
 

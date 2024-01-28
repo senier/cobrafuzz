@@ -10,69 +10,85 @@ class CobraFuzz:
         self.function = func
 
     def __call__(self) -> None:
-        parser = argparse.ArgumentParser(description="Coverage-guided fuzzer for python packages")
-        parser.add_argument(
-            "dirs",
-            type=Path,
-            nargs="*",
-            help=(
-                "one or more directories/files to use as seed corpus. "
-                "the first directory will be used to save the generated test-cases"
-            ),
-        )
+        parser = argparse.ArgumentParser(description="Coverage-guided fuzzer for Python")
+
         parser.add_argument(
             "--crash-dir",
             type=Path,
             required=True,
-            help="crash output directory",
-        )
-        parser.add_argument(
-            "--artifact-name",
-            type=str,
-            help="set exact artifact path for crashes/OOMs",
+            help="Crash output directory.",
         )
         parser.add_argument(
             "--regression",
-            type=bool,
-            default=False,
-            help="run the fuzzer through set of files for regression or reproduction",
+            action="store_true",
+            help="Runner target on examples in crash directory, print errors and exit.",
         )
-        parser.add_argument("--rss-limit-mb", type=int, default=2048, help="Memory usage in MB")
+
+        parser.add_argument(
+            "-j",
+            "--num-workers",
+            type=int,
+            help="Number of parallel workers (default: one less than CPUs available).",
+        )
         parser.add_argument(
             "--max-input-size",
             type=int,
             default=4096,
-            help="Max input size in bytes",
+            help="Max input size to be generated in bytes.",
         )
         parser.add_argument(
-            "--close-fd-mask",
-            type=int,
-            default=0,
-            help="Indicate output streams to close at startup",
+            "--close-stdout",
+            type=bool,
+            default=False,
+            help="Close standard output on worker startup.",
         )
         parser.add_argument(
-            "--runs",
-            type=int,
-            default=-1,
-            help="Number of individual test runs, -1 (the default) to run indefinitely.",
+            "--close-stderr",
+            type=bool,
+            default=False,
+            help="Close standard error on worker startup.",
         )
         parser.add_argument(
-            "--timeout",
-            type=int,
-            default=30,
-            help="If input takes longer then this timeout the process is treated as failure case",
+            "--artifact-name",
+            type=str,
+            help="Use exact artifact name for crashes.",
         )
+        parser.add_argument(
+            "--max-crashes",
+            type=int,
+            help="Maximum number crashes before exiting.",
+        )
+        parser.add_argument(
+            "--max-runs",
+            type=int,
+            help="Maximum number test runs to perform.",
+        )
+        parser.add_argument(
+            "--max-time",
+            type=int,
+            help="Maximum number of seconds to run the fuzzer.",
+        )
+
+        parser.add_argument(
+            "seeds",
+            type=Path,
+            nargs="*",
+            help="List of files or directories to seed corpus from.",
+        )
+
         args = parser.parse_args()
         f = fuzzer.Fuzzer(
-            target=self.function,
             crash_dir=args.crash_dir,
-            dirs=args.dirs,
+            target=self.function,
             artifact_name=args.artifact_name,
-            rss_limit_mb=args.rss_limit_mb,
-            timeout=args.timeout,
-            regression=args.regression,
+            close_stderr=args.close_stderr,
+            close_stdout=args.close_stdout,
+            max_crashes=args.max_crashes,
             max_input_size=args.max_input_size,
-            close_fd_mask=args.close_fd_mask,
-            runs=args.runs,
+            max_runs=args.max_runs,
+            max_time=args.max_time,
+            num_workers=args.num_workers,
+            regression=args.regression,
+            seeds=args.seeds,
         )
         f.start()

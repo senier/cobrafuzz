@@ -4,32 +4,76 @@ import hashlib
 import io
 import logging
 import multiprocessing as mp
-import os
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
-import psutil
-
-# TODO(senier): #1
-mp.set_start_method("fork")
-
-from cobrafuzz import corpus, tracer  # noqa: E402, ref:#1
+from cobrafuzz import corpus, tracer
 
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 logging.getLogger().setLevel(logging.DEBUG)
 
-SAMPLING_WINDOW = 5  # IN SECONDS
+
+class Coverage:
+    def __init__(self) -> None:
+        self._covered: set[tuple[Optional[str], Optional[int], str, int]] = set()
+
+    def store_and_check_improvement(
+        self,
+        data: set[tuple[Optional[str], Optional[int], str, int]],
+    ) -> bool:
+        covered = len(self._covered)
+        self._covered |= data
+        if len(self._covered) > covered:
+            return True
+        return False
+
+    @property
+    def total(self) -> int:
+        return len(self._covered)
 
 
-def worker(
+@dataclass
+class Update:
+    data: bytes
+    covered: set[tuple[Optional[str], Optional[int], str, int]]
+
+
+@dataclass
+class Status:
+    wid: int
+    runs: int
+
+
+@dataclass
+class Result(Status):
+    data: bytes
+
+
+@dataclass
+class Report(Result):
+    covered: set[tuple[Optional[str], Optional[int], str, int]]
+
+
+@dataclass
+class Error(Result):
+    error: str
+
+
+def worker(  # noqa: PLR0913
+    wid: int,
     target: Callable[[bytes], None],
-    child_conn: mp.connection.Connection,
-    close_fd_mask: int,
+    update_queue: mp.Queue[Update],
+    result_queue: mp.Queue[Status],
+    close_stdout: bool,
+    close_stderr: bool,
+    max_input_size: int,
+    stat_frequency: int,
+    seeds: list[Path],
 ) -> None:
-    # Silence the fuzzee's noise
-    class DummyFile(io.StringIO):
+    class NullFile(io.StringIO):
         """No-op to trash stdout away."""
 
         def write(self, arg: str) -> int:
@@ -37,81 +81,149 @@ def worker(
 
     logging.captureWarnings(capture=True)
     logging.getLogger().setLevel(logging.ERROR)
-    if close_fd_mask & 1:
-        sys.stdout = DummyFile()
-    if close_fd_mask & 2:
-        sys.stderr = DummyFile()
+
+    if close_stdout:
+        sys.stdout = NullFile()
+    if close_stderr:
+        sys.stderr = NullFile()
+
+    runs = 0
+    last_status = time.time()
+    corp = corpus.Corpus(seeds=seeds, max_input_size=max_input_size)
+    cov = Coverage()
 
     tracer.initialize()
+
     while True:
-        buf = child_conn.recv_bytes()
+        tracer.reset()
+
+        while not update_queue.empty():
+            update = update_queue.get()
+            cov.store_and_check_improvement(update.covered)
+            corp.put(bytearray(update.data))
+
+        runs += 1
+        data = corp.generate_input()
+
         try:
-            target(buf)
-        except Exception as e:
-            logging.exception(buf)
-            child_conn.send(e)
-            break
+            target(data)
+        except Exception as e:  # noqa: BLE001
+            result_queue.put(Error(wid=wid, runs=runs, data=data, error=str(e)))
+            runs = 0
+            last_status = time.time()
         else:
-            child_conn.send_bytes(b"%d" % tracer.get_coverage())
+            new_path = cov.store_and_check_improvement(data=tracer.get_covered())
+            if new_path:
+                result_queue.put(
+                    Report(wid=wid, runs=runs, data=data, covered=tracer.get_covered()),
+                )
+                runs = 0
+                last_status = time.time()
+            elif time.time() - last_status > stat_frequency:
+                result_queue.put(Status(wid=wid, runs=runs))
+                runs = 0
+                last_status = time.time()
 
 
 class Fuzzer:
     def __init__(  # noqa: PLR0913, ref:#2
         self,
-        target: Callable[[bytes], None],
         crash_dir: Path,
-        dirs: Optional[list[Path]] = None,
+        target: Callable[[bytes], None],
         artifact_name: Optional[str] = None,
-        rss_limit_mb: int = 2048,
-        timeout: int = 120,
-        regression: bool = False,
+        close_stderr: bool = False,
+        close_stdout: bool = False,
+        stat_frequency: int = 5,
+        max_crashes: Optional[int] = None,
         max_input_size: int = 4096,
-        close_fd_mask: int = 0,
-        runs: int = -1,
+        max_runs: Optional[int] = None,
+        max_time: Optional[int] = None,
+        num_workers: Optional[int] = 1,
+        regression: bool = False,
+        seeds: Optional[list[Path]] = None,
     ):
-        self._target = target
+        """
+        Fuzz-test target and store crash artifacts into crash_dir.
+
+        Arguments:
+        ---------
+        crash_dir:      Directory to store crash artifacts in. Will be created if missing.
+        target:         Python function to fuzz-test. Must accept bytes.
+                        Exceptions are considered crashes.
+        artifact_name:  Store all artifacts under this name. Existing artifacts will get
+                        overwritten (useful with max_crashes=1).
+        close_stderr:   Close standard error when starting fuzzing process.
+        close_stdout:   Close standard output when starting fuzzing process.
+        stat_frequency: Frequency in which to produce a statistics if no other events are logged.
+        max_crashes:    Number of crashes after which to exit the fuzzer.
+        max_input_size: Maximum length of input to create.
+        max_runs:       Number of target executions after which to exit the fuzzer.
+        max_time:       Number of seconds after which to exit the fuzzer.
+        num_workers:    Number of parallel workers.
+                        Use None to spawn one fewer than CPUs available.
+        regression:     Execute target on all samples found in crash_dir, print errors and exit.
+        seeds:          List of files and directories to seed the fuzzer with.
+        """
+
+        self._current_crashes = 0
+        self._current_runs = 0
+        self._last_runs = 0
+        self._last_stats_time = time.time()
+        self._mp_ctx: mp.context.ForkContext = mp.get_context("fork")
+        self._result_queue: mp.Queue[Result] = self._mp_ctx.Queue()
+        self._workers: list[tuple[mp.context.ForkProcess, mp.Queue[Update]]] = []
+
         self._crash_dir = crash_dir
-        self._dirs = [] if dirs is None else dirs
+        self._target = target
+
         self._artifact_name = artifact_name
-        self._rss_limit_mb = rss_limit_mb
-        self._timeout = timeout
-        self._regression = regression
-        self._close_fd_mask = close_fd_mask
-        self._corpus = corpus.Corpus(self._dirs, max_input_size)
-        self._total_executions = 0
-        self._executions_in_sample = 0
-        self._last_sample_time = time.time()
-        self._total_coverage = 0
-        self._p: Optional[mp.Process] = None
-        self.runs = runs
+        self._close_stderr = close_stderr
+        self._close_stdout = close_stdout
+        self._stat_frequency = stat_frequency
+        self._max_crashes = max_crashes
+        self._max_input_size = max_input_size
+        self._max_runs = max_runs
+        self._max_time = max_time
+        self._num_workers: int = num_workers or self._mp_ctx.cpu_count() - 1
+        self._seeds = seeds or []
 
-    def log_stats(self, log_type: str) -> int:
-        assert self._p is not None
-        rss: int = (
-            (
-                psutil.Process(self._p.pid).memory_info().rss
-                + psutil.Process(os.getpid()).memory_info().rss
-            )
-            / 1024
-            / 1024
-        )
+        if regression:
+            for error_file in crash_dir.glob("*"):
+                if not error_file.is_file():
+                    continue
+                with error_file.open("br") as f:
+                    try:
+                        target(f.read())
+                    except Exception:
+                        logging.exception(
+                            "\n========================================================================\n"
+                            "Testing %s:",
+                            error_file,
+                        )
+                    else:
+                        logging.error("No error when testing %s", error_file)
+            sys.exit(0)
 
+    def _log_stats(self, log_type: str, total_coverage: int, corpus_size: int) -> None:
         end_time = time.time()
-        execs_per_second = int(self._executions_in_sample / (end_time - self._last_sample_time))
-        self._last_sample_time = time.time()
-        self._executions_in_sample = 0
-        logging.info(
-            "#%d %s     cov: %d corp: %d exec/s: %d rss: %d MB",
-            self._total_executions,
-            log_type,
-            self._total_coverage,
-            self._corpus.length,
-            execs_per_second,
-            rss,
+        execs_per_second = int(
+            (self._current_runs - self._last_runs) / (end_time - self._last_stats_time),
         )
-        return rss
 
-    def write_sample(self, buf: bytes, prefix: str = "crash-") -> None:
+        self._last_stats_time = end_time
+        self._last_runs = self._current_runs
+
+        logging.info(
+            "#%d %s     cov: %d corp: %d exec/s: %d crashes: %d",
+            self._current_runs,
+            log_type,
+            total_coverage,
+            corpus_size,
+            execs_per_second,
+            self._current_crashes,
+        )
+
+    def _write_sample(self, buf: bytes, prefix: str = "crash-") -> None:
         m = hashlib.sha256()
         m.update(buf)
 
@@ -127,51 +239,97 @@ class Fuzzer:
         if len(buf) < 200:
             logging.info("sample = %s", buf.hex())
 
-    def start(self) -> None:
-        logging.info("#0 READ units: %d", self._corpus.length)
-        exit_code = 0
-        parent_conn, child_conn = mp.Pipe()
-        self._p = mp.Process(target=worker, args=(self._target, child_conn, self._close_fd_mask))
-        self._p.start()
+    def _initialize_process(self, wid: int) -> tuple[mp.context.ForkProcess, mp.Queue[Update]]:
+        queue: mp.Queue[Update] = self._mp_ctx.Queue()
+        result = self._mp_ctx.Process(
+            target=worker,
+            args=(
+                wid,
+                self._target,
+                queue,
+                self._result_queue,
+                self._close_stdout,
+                self._close_stderr,
+                self._max_input_size,
+                self._stat_frequency,
+                self._seeds,
+            ),
+        )
+        result.start()
+        return result, queue
+
+    def start(self) -> None:  # noqa: PLR0912
+        start_time = time.time()
+        coverage = Coverage()
+        corp = corpus.Corpus(self._seeds, self._max_input_size)
+
+        self._workers = [self._initialize_process(wid) for wid in range(self._num_workers)]
+
+        logging.info(
+            "#0 READ units: %d workers: %d seeds: %d",
+            corp.length,
+            self._num_workers,
+            corp.length,
+        )
 
         while True:
-            if self.runs != -1 and self._total_executions >= self.runs:
-                self._p.terminate()
-                logging.info("did %d runs, stopping now.", self.runs)
+            if self._max_runs is not None and self._current_runs >= self._max_runs:
+                for p, _ in self._workers:
+                    p.terminate()
+                logging.info(
+                    "Performed %d runs (%d/s), stopping.",
+                    self._max_runs,
+                    self._max_runs / (time.time() - start_time),
+                )
                 break
 
-            buf = self._corpus.generate_input()
-            parent_conn.send_bytes(buf)
-            if not parent_conn.poll(self._timeout):
-                self._p.kill()
-                logging.info("=================================================================")
-                logging.info("timeout reached. testcase took: %d", self._timeout)
-                self.write_sample(buf, prefix="timeout-")
+            if self._max_time is not None and (time.time() - start_time) > self._max_time:
+                for p, _ in self._workers:
+                    p.terminate()
+                logging.info(
+                    "Timeout after %d seconds, stopping.",
+                    self._max_time,
+                )
                 break
 
-            try:
-                total_coverage = int(parent_conn.recv_bytes())
-            except ValueError:
-                self.write_sample(buf)
-                exit_code = 76
+            if self._max_crashes is not None and self._current_crashes >= self._max_crashes:
+                for p, _ in self._workers:
+                    p.terminate()
+                logging.info("Found %d crashes, stopping.", self._current_crashes)
                 break
 
-            self._total_executions += 1
-            self._executions_in_sample += 1
-            rss = 0
-            if total_coverage > self._total_coverage:
-                rss = self.log_stats("NEW")
-                self._total_coverage = total_coverage
-                self._corpus.put(buf)
-            else:
-                if (time.time() - self._last_sample_time) > SAMPLING_WINDOW:
-                    rss = self.log_stats("PULSE")
+            while not self._result_queue.empty():
+                result = self._result_queue.get()
+                self._current_runs += result.runs
 
-            if rss > self._rss_limit_mb:
-                logging.info("MEMORY OOM: exceeded %d MB. Killing worker", self._rss_limit_mb)
-                self.write_sample(buf)
-                self._p.kill()
-                break
+                if isinstance(result, Report):
+                    improvement = coverage.store_and_check_improvement(result.covered)
+                    if improvement:
+                        self._log_stats("NEW", coverage.total, corp.length)
+                        corp.put(bytearray(result.data))
 
-        self._p.join()
-        sys.exit(exit_code)
+                        for wid, (_, queue) in enumerate(self._workers):
+                            if wid != result.wid:
+                                queue.put(Update(data=result.data, covered=result.covered))
+
+                elif isinstance(result, Error):
+                    # TODO(senier): Extend to write error message
+                    self._write_sample(result.data)
+                    self._current_crashes += 1
+
+                if isinstance(result, Status):
+                    pass
+
+                else:
+                    assert False, f"Unhandled result type: {type(result)}"
+
+            if (time.time() - self._last_stats_time) > self._stat_frequency:
+                self._log_stats("PULSE", coverage.total, corp.length)
+
+        for _, queue in self._workers:
+            queue.cancel_join_thread()
+        self._result_queue.cancel_join_thread()
+
+        for p, _ in self._workers:
+            p.join()
+        sys.exit(0)
