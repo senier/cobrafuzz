@@ -27,7 +27,7 @@ def test_example(
     test: str,
 ) -> None:
     with monkeypatch.context() as mp:
-        mp.setattr(sys, "argv", ["fuzz", "--crash-dir", str(tmp_path), "--runs", "100"])
+        mp.setattr(sys, "argv", ["fuzz", "--crash-dir", str(tmp_path), "--max-runs", "100"])
         fuzz = importlib.import_module(f"examples.{test}.fuzz")
         with pytest.raises(SystemExit, match="^0$"):
             fuzz.fuzz()

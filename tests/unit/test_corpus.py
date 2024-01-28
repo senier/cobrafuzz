@@ -21,7 +21,7 @@ def test_add_file_constructor(tmpdir: Path) -> None:
     filename = Path(tmpdir) / "input.dat"
     with filename.open("wb") as f:
         f.write(b"deadbeef")
-    c = corpus.Corpus(dirs=[filename])
+    c = corpus.Corpus(seeds=[filename])
     assert c._inputs == [bytearray(b"deadbeef"), bytearray(0)]  # noqa: SLF001
 
 
@@ -35,7 +35,7 @@ def test_add_files_constructor(tmpdir: Path) -> None:
     with (basedir / "f2").open("wb") as f:
         f.write(b"deadc0de")
 
-    c = corpus.Corpus(dirs=[basedir])
+    c = corpus.Corpus(seeds=[basedir])
     assert sorted(c._inputs) == sorted(  # noqa: SLF001
         [
             bytearray(b"deadc0de"),
@@ -47,7 +47,7 @@ def test_add_files_constructor(tmpdir: Path) -> None:
 
 def test_create_dir_constructor(tmpdir: Path) -> None:
     dirname = Path(tmpdir) / "input"
-    c = corpus.Corpus(dirs=[dirname])
+    c = corpus.Corpus(save_dir=dirname)
     assert dirname.exists()
     assert dirname.is_dir()
     assert c._inputs == [bytearray(0)]  # noqa: SLF001
@@ -120,7 +120,7 @@ def test_put_corpus_not_saved() -> None:
 
 
 def test_put_corpus_saved(tmpdir: Path) -> None:
-    c = corpus.Corpus(dirs=[Path(tmpdir)])
+    c = corpus.Corpus(save_dir=Path(tmpdir))
     c.put(bytearray(b"deadbeef"))
     outfile = Path(tmpdir) / hashlib.sha256(b"deadbeef").hexdigest()
     assert c._inputs == [bytearray(0), bytearray(b"deadbeef")]  # noqa: SLF001
@@ -133,9 +133,9 @@ def test_generate_input(tmpdir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     filename = Path(tmpdir) / "input.dat"
     with filename.open("wb") as f:
         f.write(b"deadbeef")
-    c = corpus.Corpus(dirs=[filename])
+    c = corpus.Corpus(seeds=[filename])
     with monkeypatch.context() as mp:
-        mp.setattr(c, "mutate", lambda v: v)
+        mp.setattr(corpus, "mutate", lambda v, _: v)
         mp.setattr(corpus, "_rand", lambda _: 0)
         assert c.generate_input() == bytearray(b"deadbeef")
         assert c.generate_input() == bytearray(0)
@@ -143,13 +143,12 @@ def test_generate_input(tmpdir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_mutate(monkeypatch: pytest.MonkeyPatch) -> None:
-    c = corpus.Corpus()
     with monkeypatch.context() as mp:
         mp.setattr(corpus, "_rand_exp", lambda: 2)
         mp.setattr(corpus, "_rand", lambda _: 5)
         mp.setattr(secrets, "token_bytes", lambda _: bytearray(b"inserted"))
         mp.setattr(random, "choice", lambda _: corpus._mutate_insert_range_of_bytes)  # noqa: SLF001
-        assert c.mutate(bytearray(b"0123456789")) == bytearray(b"01234insertedinserted56789")
+        assert corpus.mutate(bytearray(b"0123456789")) == bytearray(b"01234insertedinserted56789")
 
 
 def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -159,19 +158,17 @@ def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
             return False
         return True
 
-    c = corpus.Corpus()
     with monkeypatch.context() as mp:
         mp.setattr(corpus, "_rand_exp", lambda: 2)
         mp.setattr(random, "choice", lambda _: modify)
-        assert c.mutate(bytearray(b"0123456789")) == bytearray(b"\x00123456789")
+        assert corpus.mutate(bytearray(b"0123456789")) == bytearray(b"\x00123456789")
 
 
 def test_mutate_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
-    c = corpus.Corpus(max_input_size=4)
     with monkeypatch.context() as mp:
         mp.setattr(corpus, "_rand_exp", lambda: 1)
         mp.setattr(random, "choice", lambda _: lambda x: x)
-        assert c.mutate(bytearray(b"0123456789")) == bytearray(b"0123")
+        assert corpus.mutate(bytearray(b"0123456789"), max_input_size=4) == bytearray(b"0123")
 
 
 def test_mutate_remove_range_of_bytes_fail() -> None:

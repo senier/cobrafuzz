@@ -18,8 +18,10 @@ def test_main(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
                 "main",
                 "--crash-dir",
                 str(tmp_path),
-                "--runs",
-                "100",
+                "--max-runs",
+                "500",
+                "--max-crashes",
+                "1",
             ],
         )
         c = CobraFuzz(target)
