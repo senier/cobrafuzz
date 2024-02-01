@@ -19,10 +19,10 @@ check_kacl: .devel_installed
 test: test_unit test_integration test_build
 
 test_unit: .devel_installed
-	PYTHONPATH=. pytest -vv --cov-report term:skip-covered --cov-report xml:coverage.xml --cov=cobrafuzz --cov=tests.unit --cov-branch --cov-fail-under=100 tests/unit
+	PYTHONPATH=. timeout -k 30 120 pytest -vv --cov-report term:skip-covered --cov-report xml:coverage.xml --cov=cobrafuzz --cov=tests.unit --cov-branch --cov-fail-under=100 tests/unit
 
 test_integration: .devel_installed
-	PYTHONPATH=. pytest -vv tests/integration
+	PYTHONPATH=. timeout -k 30 360 pytest -vv tests/integration
 
 test_build: .devel_installed
 	python3 -m build
