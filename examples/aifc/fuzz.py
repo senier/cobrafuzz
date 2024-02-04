@@ -1,3 +1,5 @@
+# mypy: disable-error-code="attr-defined"
+
 import aifc
 import io
 
@@ -5,7 +7,7 @@ from cobrafuzz.main import CobraFuzz
 
 
 @CobraFuzz
-def fuzz(buf):
+def fuzz(buf: bytes) -> None:
     try:
         f = io.BytesIO(buf)
         a = aifc.open(f)

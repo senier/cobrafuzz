@@ -4,7 +4,7 @@ from cobrafuzz.main import CobraFuzz
 
 
 @CobraFuzz
-def fuzz(buf):
+def fuzz(buf: bytes) -> None:
     try:
         string = buf.decode("ascii")
         parser = HTMLParser()
