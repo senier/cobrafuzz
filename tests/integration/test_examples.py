@@ -12,7 +12,6 @@ import pytest
         "beautifulsoup",
         "codeop",
         "furl",
-        "fuzzit",
         "htmlparser",
         "isort",
         "purl",
