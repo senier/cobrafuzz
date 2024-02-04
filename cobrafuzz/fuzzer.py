@@ -58,8 +58,23 @@ class Report(Result):
 
 
 @dataclass
-class Error(Result):
-    error: str
+class Error(Report):
+    pass
+
+
+def covered(e: Exception) -> set[tuple[Optional[str], Optional[int], str, int]]:
+    """Construct coverage information from exception."""
+
+    prev_line: Optional[int] = None
+    prev_file: Optional[str] = None
+    tb = e.__traceback__
+    covered = set()
+    while tb:
+        covered.add((prev_file, prev_line, tb.tb_frame.f_code.co_filename, tb.tb_lineno))
+        prev_line = tb.tb_lineno
+        prev_file = tb.tb_frame.f_code.co_filename
+        tb = tb.tb_next
+    return covered
 
 
 def worker(  # noqa: PLR0913
@@ -108,7 +123,7 @@ def worker(  # noqa: PLR0913
         try:
             target(data)
         except Exception as e:  # noqa: BLE001
-            result_queue.put(Error(wid=wid, runs=runs, data=data, error=str(e)))
+            result_queue.put(Error(wid=wid, runs=runs, data=data, covered=covered(e)))
             runs = 0
             last_status = time.time()
         else:
@@ -302,7 +317,13 @@ class Fuzzer:
                 result = self._result_queue.get()
                 self._current_runs += result.runs
 
-                if isinstance(result, Report):
+                if isinstance(result, Error):
+                    improvement = coverage.store_and_check_improvement(result.covered)
+                    if improvement:
+                        self._current_crashes += 1
+                        self._write_sample(result.data)
+
+                elif isinstance(result, Report):
                     improvement = coverage.store_and_check_improvement(result.covered)
                     if improvement:
                         self._log_stats("NEW", coverage.total, corp.length)
@@ -312,12 +333,7 @@ class Fuzzer:
                             if wid != result.wid:
                                 queue.put(Update(data=result.data, covered=result.covered))
 
-                elif isinstance(result, Error):
-                    # TODO(senier): Extend to write error message
-                    self._write_sample(result.data)
-                    self._current_crashes += 1
-
-                if isinstance(result, Status):
+                elif isinstance(result, Status):
                     pass
 
                 else:
