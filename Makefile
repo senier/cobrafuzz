@@ -1,4 +1,4 @@
-PYTHON_PACKAGES = cobrafuzz/*.py tests/**/*.py
+PYTHON_PACKAGES = cobrafuzz/*.py tests/**/*.py examples/**/*.py
 
 all: check test
 

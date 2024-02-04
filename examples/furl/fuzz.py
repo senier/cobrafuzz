@@ -1,10 +1,11 @@
-from cobrafuzz.main import CobraFuzz
+# mypy: disable-error-code="attr-defined"
 
+from cobrafuzz.main import CobraFuzz
 from furl import furl
 
 
 @CobraFuzz
-def fuzz(buf):
+def fuzz(buf: bytes) -> None:
     try:
         string = buf.decode("ascii")
         f = furl(string)

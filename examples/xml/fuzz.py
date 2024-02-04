@@ -5,7 +5,7 @@ from cobrafuzz.main import CobraFuzz
 
 
 @CobraFuzz
-def fuzz(buf):
+def fuzz(buf: bytes) -> None:
     try:
         string = buf.decode("utf-8")
         ElementTree.fromstring(string)  # noqa: S314

@@ -1,18 +1,13 @@
+# mypy: disable-error-code="attr-defined"
+
 import io
 import zipfile
 
-# from html.parser import HTMLParser
 from cobrafuzz.main import CobraFuzz
 
 
 @CobraFuzz
-def fuzz(buf):
-    # try:
-    #     string = buf.decode("utf-8")
-    #     parser = HTMLParser()
-    #     parser.feed(string)
-    # except UnicodeDecodeError:
-    #     pass
+def fuzz(buf: bytes) -> None:
     f = io.BytesIO(buf)
     try:
         z = zipfile.ZipFile(f)
