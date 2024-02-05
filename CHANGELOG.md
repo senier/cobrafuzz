@@ -5,16 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2024-02-05
 
 ### Added
 
-- Support code coverage and fuzzing at the same time
 - Parallel fuzzing (#11)
 - Global timeout (#14)
+- Support for code coverage and fuzzing at the same time
 
 ### Fixed
 
+- Use cryptographic randomness (#16)
 - Regression mode
 - Prevent tracer from being replaced by secondary tracer
 
@@ -23,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Continue after error was found, make number of errors configurable (#12)
 - Make crash dir configurable (#13)
 - Use mp.get_context for multiprocessing (#1)
+- Report only crashes for new paths (#19)
 - Use flags instead of file descriptor mask to close stdout and stderr
 - Make logging frequency configurable via --stat-frequency
 
@@ -48,6 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rename to cobrafuzz
 - Enable GitHub CI
 
-[Unreleased]: https://github.com/senier/cobrafuzz/compare/v1.0.12...HEAD
+[2.0.0]: https://github.com/senier/cobrafuzz/compare/v1.0.12...v2.0.0
 [1.0.12]: https://github.com/senier/cobrafuzz/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/senier/cobrafuzz/compare/1.0.10...v1.0.11
