@@ -91,7 +91,7 @@ def _mutate_add_subtract_from_a_uint16(res: bytearray, _: Optional[Config] = Non
     pos = util.rand(len(res) - 1)
     v_int = util.rand(2**16)
     v = struct.pack(">H", v_int) if util.rand_bool() else struct.pack("<H", v_int)
-    # TODO(senier): Implement version performing 16-bit addition
+    # TODO(#18): Implement version performing 16-bit addition
     res[pos] = (res[pos] + v[0]) % 256
     res[pos + 1] = (res[pos + 1] + v[1]) % 256
 
