@@ -1,10 +1,42 @@
 from __future__ import annotations
 
+from secrets import choice, randbelow, randbits
 from typing import Optional
 
 
 class OutOfBoundsError(Exception):
     pass
+
+
+def rand(n: int) -> int:
+    if n < 1:
+        return 0
+    return randbelow(n)
+
+
+def rand_bool() -> bool:
+    return choice([True, False])
+
+
+def rand_exp() -> int:
+    """Generate random value with distribution 1/2^(n+1)."""
+    return f"{randbits(32):032b}1".index("1")
+
+
+def choose_len(n: int) -> int:
+    """
+    Choose a length based on input value.
+
+    With 90% probability, choose a random value in [1, n] (if n <=  8, otherwise [1, 8])
+    With  9% probability, choose a random value in [1, n] (if n <= 32, otherwise [1, 32])
+    With  1% probability, choose a random value in [1, n]
+    """
+    x = rand(100)
+    if x < 90:
+        return rand(min(8, n)) + 1
+    if x < 99:
+        return rand(min(32, n)) + 1
+    return rand(n) + 1
 
 
 def copy(
