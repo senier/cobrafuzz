@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = "cobrafuzz"
-version = "1.0.13"
+version = "2.0.0"
 authors = [
     {name = "Alexander Senier", email = "mail@senier.net"}
 ]
@@ -16,7 +16,7 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Software Development :: Testing",
 ]
-requires-python = '>=3.5.3'
+requires-python = '>=3.9.0'
 
 [project.optional-dependencies]
 devel = [
