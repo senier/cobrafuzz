@@ -18,22 +18,58 @@ class State:
         self,
         seeds: Optional[list[Path]] = None,
         max_input_size: int = 4096,
+        file: Optional[Path] = None,
     ):
+        seeds = seeds or []
+
         self._VERSION = 1
         self._max_input_size = max_input_size
         self._covered: set[tuple[Optional[str], Optional[int], str, int]] = set()
         self._inputs: list[bytearray] = []
+        self._num_seeds = len(seeds)
+        self._file = file
 
-        for path in [p for p in seeds or [] if p.is_file()] + [
-            f for p in seeds or [] if not p.is_file() for f in p.glob("*") if f.is_file()
+        for path in [p for p in seeds if p.is_file()] + [
+            f for p in seeds if not p.is_file() for f in p.glob("*") if f.is_file()
         ]:
             with path.open("rb") as f:
                 self._inputs.append(bytearray(f.read()))
         if not self._inputs:
             self._inputs.append(bytearray(0))
+        self._load()
 
-    def save(self, filename: Path) -> None:
-        with filename.open(mode="w+") as sf:
+    @property
+    def num_seeds(self) -> int:
+        return self._num_seeds
+
+    def _load(self) -> None:
+        if not self._file:
+            return
+
+        try:
+            with self._file.open() as sf:
+                data = json.load(sf)
+                if "version" not in data or data["version"] != self._VERSION:
+                    raise LoadError(
+                        f"Invalid version in state file {self._file} (expected {self._VERSION})",
+                    )
+                self._covered |= {tuple(e) for e in data["coverage"]}
+                self._inputs.extend(
+                    bytearray(ast.literal_eval(f"b'{i}'")) for i in data["population"]
+                )
+        except FileNotFoundError:
+            pass
+        except (json.JSONDecodeError, TypeError):
+            self._file.unlink()
+            logging.info("Malformed state file: %s", self._file)
+        except OSError as e:
+            logging.info("Error opening state file: %s", e)
+            self._file = None
+
+    def save(self) -> None:
+        if not self._file:
+            return
+        with self._file.open(mode="w+") as sf:
             json.dump(
                 obj={
                     "version": self._VERSION,
@@ -43,26 +79,6 @@ class State:
                 fp=sf,
                 ensure_ascii=True,
             )
-
-    def load(self, filename: Path) -> None:
-        try:
-            with filename.open() as sf:
-                data = json.load(sf)
-                if "version" not in data or data["version"] != self._VERSION:
-                    raise LoadError(
-                        f"Invalid version in state file {filename} (expected {self._VERSION})",
-                    )
-                self._covered |= {tuple(e) for e in data["coverage"]}
-                self._inputs.extend(
-                    bytearray(ast.literal_eval(f"b'{i}'")) for i in data["population"]
-                )
-        except FileNotFoundError:
-            pass
-        except (json.JSONDecodeError, TypeError):
-            filename.unlink()
-            logging.info("Malformed state file: %s", filename)
-        except OSError as e:
-            logging.info("Error opening state file: %s", e)
 
     def store_coverage(
         self,

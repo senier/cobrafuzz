@@ -185,34 +185,53 @@ class Fuzzer:
         self._workers: list[tuple[MPProcess, mp.Queue[Update]]] = []
 
         self._crash_dir = crash_dir
-        self._target = pickle.dumps(target)
+        self._target_bytes = pickle.dumps(target)
 
         self._close_stderr = close_stderr
         self._close_stdout = close_stdout
         self._stat_frequency = stat_frequency
         self._max_crashes = max_crashes
-        self._max_input_size = max_input_size
         self._max_runs = max_runs
         self._max_time = max_time
         self._num_workers: int = num_workers or self._mp_ctx.cpu_count() - 1
-        self._seeds = seeds or []
-        self._state_file = state_file
+        self._state = st.State(seeds=seeds, max_input_size=max_input_size, file=state_file)
+
+        self._load_crashes(regression=regression)
+
+    def _load_crashes(self, regression: bool) -> None:
+        """
+        Load crash coverage from crash directory.
+
+        Arguments:
+        ---------
+        regression: Output unique errors and then exit.
+        """
+
+        target = cast(Callable[[bytes], None], pickle.loads(self._target_bytes))  # noqa: S301
+        local_state = st.State()
+
+        for error_file in self._crash_dir.glob("*"):
+            if not error_file.is_file():
+                continue
+            with error_file.open("br") as f:
+                try:
+                    target(f.read())
+                except Exception as e:  # noqa: BLE001
+                    if regression:
+                        changed = local_state.store_coverage(covered(e))
+                        if changed:
+                            logging.exception(
+                                "\n========================================================================\n"
+                                "Testing %s:",
+                                error_file,
+                            )
+                    else:
+                        self._state.store_coverage(covered(e))
+                else:
+                    if regression:
+                        logging.error("No error when testing %s", error_file)
 
         if regression:
-            for error_file in crash_dir.glob("*"):
-                if not error_file.is_file():
-                    continue
-                with error_file.open("br") as f:
-                    try:
-                        target(f.read())
-                    except Exception:
-                        logging.exception(
-                            "\n========================================================================\n"
-                            "Testing %s:",
-                            error_file,
-                        )
-                    else:
-                        logging.error("No error when testing %s", error_file)
             sys.exit(0)
 
     def _log_stats(self, log_type: str, total_coverage: int, corpus_size: int) -> None:
@@ -250,19 +269,19 @@ class Fuzzer:
         if len(buf) < 200:
             logging.info("sample = %s", buf.hex())
 
-    def _initialize_process(self, wid: int, state: st.State) -> tuple[MPProcess, mp.Queue[Update]]:
+    def _initialize_process(self, wid: int) -> tuple[MPProcess, mp.Queue[Update]]:
         queue: mp.Queue[Update] = self._mp_ctx.Queue()
         result = self._mp_ctx.Process(
             target=worker,
             args=(
                 wid,
-                self._target,
+                self._target_bytes,
                 queue,
                 self._result_queue,
                 self._close_stdout,
                 self._close_stderr,
                 self._stat_frequency,
-                state,
+                self._state,
             ),
         )
         result.start()
@@ -270,20 +289,14 @@ class Fuzzer:
 
     def start(self) -> None:  # noqa: PLR0912
         start_time = time.time()
-        state = st.State(self._seeds, self._max_input_size)
 
-        if self._state_file:
-            state.load(self._state_file)
-
-        self._workers = [
-            self._initialize_process(wid=wid, state=state) for wid in range(self._num_workers)
-        ]
+        self._workers = [self._initialize_process(wid=wid) for wid in range(self._num_workers)]
 
         logging.info(
             "#0 READ units: %d workers: %d seeds: %d",
-            state.size,
+            self._state.size,
             self._num_workers,
-            len(self._seeds),
+            self._state.num_seeds,
         )
 
         while True:
@@ -311,19 +324,17 @@ class Fuzzer:
                 self._current_runs += result.runs
 
                 if isinstance(result, Error):
-                    improvement = state.store_coverage(result.covered)
+                    improvement = self._state.store_coverage(result.covered)
                     if improvement:
                         self._current_crashes += 1
                         self._write_sample(result.data)
 
                 elif isinstance(result, Report):
-                    improvement = state.store_coverage(result.covered)
+                    improvement = self._state.store_coverage(result.covered)
                     if improvement:
-                        self._log_stats("NEW", state.total_coverage, state.size)
-                        state.put_input(bytearray(result.data))
-
-                        if self._state_file:
-                            state.save(self._state_file)
+                        self._log_stats("NEW", self._state.total_coverage, self._state.size)
+                        self._state.put_input(bytearray(result.data))
+                        self._state.save()
 
                         for wid, (_, queue) in enumerate(self._workers):
                             if wid != result.wid:
@@ -336,7 +347,9 @@ class Fuzzer:
                     assert False, f"Unhandled result type: {type(result)}"
 
             if (time.time() - self._last_stats_time) > self._stat_frequency:
-                self._log_stats("PULSE", state.total_coverage, state.size)
+                self._log_stats("PULSE", self._state.total_coverage, self._state.size)
+
+        self._state.save()
 
         for _, queue in self._workers:
             queue.cancel_join_thread()
@@ -347,4 +360,4 @@ class Fuzzer:
 
         for p, _ in self._workers:
             p.join()
-        sys.exit(0)
+        sys.exit(0 if self._current_crashes == 0 else 1)
