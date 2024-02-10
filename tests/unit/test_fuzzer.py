@@ -46,9 +46,13 @@ def test_stats(
 
 
 def test_write_sample(tmp_path: Path) -> None:
-    f = fuzzer.Fuzzer(target=non_crashing_target, crash_dir=tmp_path, artifact_name="artifact")
-    f._write_sample(1000 * b"x")  # noqa: SLF001
-    assert (tmp_path / "artifact").is_file()
+    sample = 1000 * b"x"
+    f = fuzzer.Fuzzer(target=non_crashing_target, crash_dir=tmp_path)
+    f._write_sample(sample)  # noqa: SLF001
+    artifact = next(tmp_path.glob("*"))
+    assert artifact.is_file()
+    with artifact.open("rb") as af:
+        assert af.read() == sample
 
 
 def test_regression(tmp_path: Path) -> None:

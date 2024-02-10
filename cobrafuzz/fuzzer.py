@@ -152,7 +152,6 @@ class Fuzzer:
         self,
         crash_dir: Path,
         target: Callable[[bytes], None],
-        artifact_name: Optional[str] = None,
         close_stderr: bool = False,
         close_stdout: bool = False,
         stat_frequency: int = 5,
@@ -173,8 +172,6 @@ class Fuzzer:
         crash_dir:      Directory to store crash artifacts in. Will be created if missing.
         target:         Python function to fuzz-test. Must accept bytes.
                         Exceptions are considered crashes.
-        artifact_name:  Store all artifacts under this name. Existing artifacts will get
-                        overwritten (useful with max_crashes=1).
         close_stderr:   Close standard error when starting fuzzing process.
         close_stdout:   Close standard output when starting fuzzing process.
         stat_frequency: Frequency in which to produce a statistics if no other events are logged.
@@ -210,7 +207,6 @@ class Fuzzer:
         self._crash_dir = crash_dir
         self._target = pickle.dumps(target)
 
-        self._artifact_name = artifact_name
         self._close_stderr = close_stderr
         self._close_stdout = close_stdout
         self._stat_frequency = stat_frequency
@@ -265,7 +261,7 @@ class Fuzzer:
             self._crash_dir.mkdir(parents=True)
             logging.info("Crash dir created (%s)", self._crash_dir)
 
-        crash_path = self._crash_dir / (self._artifact_name or (prefix + m.hexdigest()))
+        crash_path = self._crash_dir / (prefix + m.hexdigest())
 
         with crash_path.open("wb") as f:
             f.write(buf)

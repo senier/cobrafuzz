@@ -49,11 +49,6 @@ class CobraFuzz:
             help="Close standard error on worker startup.",
         )
         parser.add_argument(
-            "--artifact-name",
-            type=str,
-            help="Use exact artifact name for crashes.",
-        )
-        parser.add_argument(
             "--max-crashes",
             type=int,
             help="Maximum number crashes before exiting.",
@@ -68,6 +63,13 @@ class CobraFuzz:
             type=int,
             help="Maximum number of seconds to run the fuzzer.",
         )
+        parser.add_argument(
+            "--start-method",
+            type=str,
+            choices=["spawn", "forkserver", "fork"],
+            default="spawn",
+            help="Start method to be used for multiprocessing (default: %(default)s).",
+        )
 
         parser.add_argument(
             "seeds",
@@ -80,7 +82,6 @@ class CobraFuzz:
         f = fuzzer.Fuzzer(
             crash_dir=args.crash_dir,
             target=self.function,
-            artifact_name=args.artifact_name,
             close_stderr=args.close_stderr,
             close_stdout=args.close_stdout,
             max_crashes=args.max_crashes,
@@ -90,5 +91,6 @@ class CobraFuzz:
             num_workers=args.num_workers,
             regression=args.regression,
             seeds=args.seeds,
+            start_method=args.start_method,
         )
         f.start()

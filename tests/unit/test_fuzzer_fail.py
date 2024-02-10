@@ -57,18 +57,6 @@ def test_crash_with_crash_dir(tmp_path: Path) -> None:
     assert crash_dir.is_dir()
 
 
-def test_crash_with_artifact_path(tmp_path: Path) -> None:
-    f = fuzzer.Fuzzer(
-        target=crashing_target_simple,
-        crash_dir=tmp_path,
-        artifact_name="artifact",
-        max_crashes=1,
-    )
-    with pytest.raises(SystemExit, match="^0$"):
-        f.start()
-    assert (tmp_path / "artifact").is_file()
-
-
 def test_crash_stderr_stdout_closed(tmp_path: Path) -> None:
     crash_dir = tmp_path / "crashes"
     f = fuzzer.Fuzzer(
