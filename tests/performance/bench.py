@@ -4,14 +4,15 @@ import argparse
 import logging
 import time
 
-from cobrafuzz.mutator import mutate
+from cobrafuzz.mutator import Mutator
 
 
 def _mutate(rounds: int) -> None:
+    mutator = Mutator()
     data = bytearray(b"start")
     start = time.time()
     for _ in range(rounds):
-        mutate(data)
+        mutator.mutate(data)
     duration = time.time() - start
     logging.info("mutate: %d/s", rounds // duration)
 
