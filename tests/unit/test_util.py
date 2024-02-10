@@ -1,4 +1,6 @@
+import numpy as np
 import pytest
+from scipy.stats import chisquare
 
 from cobrafuzz import util
 
@@ -88,3 +90,63 @@ def test_insert_valid(data: bytes, start: int, data_to_insert: bytes, expected: 
     tmp = bytearray(data)
     util.insert(tmp, start, data_to_insert)
     assert tmp == expected
+
+
+def test_rand_uniform() -> None:
+    assert util.rand(0) == 0
+    assert util.rand(1) == 0
+
+    data = [util.rand(10) for _ in range(1, 1000000)]
+    result = chisquare(f_obs=list(np.bincount(data)))
+    assert result.pvalue > 0.05
+
+
+def test_rand_exponential() -> None:
+    expected = [round(200000 / 2 ** (n + 1)) for n in range(32)]
+    data = list(
+        np.bincount(
+            [util.rand_exp() for _ in range(sum(expected))],
+            minlength=32,
+        ),
+    )
+
+    # There should be more than 13 samples in each bin,
+    # c.f. https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.chisquare.html
+    # Starting at the position *before* the element that is <= 13, bin all remaining elements.
+    data_valid_samples = [i for i, v in enumerate(data) if v < 13]
+    assert len(data_valid_samples) > 0
+
+    expected_valid_samples = [i for i, v in enumerate(expected) if v < 13]
+    assert len(expected_valid_samples) > 0
+
+    index = min(data_valid_samples[0], expected_valid_samples[0]) - 1
+    data = data[:index] + [sum(data[index:])]
+    expected = expected[:index] + [sum(expected[index:])]
+
+    result = chisquare(f_obs=data, f_exp=expected)
+    assert result.pvalue > 0.05, result
+
+
+def test_choose_length() -> None:
+    n = 1000
+    lengths = [util.choose_len(n) for _ in range(10000)]
+
+    assert n > 32
+    assert len([v for v in lengths if v < 1]) == 0
+    assert len([v for v in lengths if v > n]) == 0
+
+    data = [
+        len([v for v in lengths if 1 <= v <= 8]),
+        len([v for v in lengths if 9 <= v <= 32]),
+        len([v for v in lengths if 33 <= v <= n]),
+    ]
+
+    # Expected distribution for range 1..8, 9..32 and 33..n
+    expected = [
+        round((0.9 + 0.0225 + (8 / (100 * n))) * sum(data)),
+        round((0.0675 + (24 / (100 * n))) * sum(data)),
+        round(((n - 32) / (100 * n)) * sum(data)),
+    ]
+
+    result = chisquare(f_obs=data, f_exp=expected)
+    assert result.pvalue > 0.05, result

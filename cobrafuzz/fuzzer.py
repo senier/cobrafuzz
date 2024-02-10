@@ -12,32 +12,13 @@ from typing import Callable, Optional, Union, cast
 
 import dill as pickle  # type: ignore[import-untyped]
 
-from cobrafuzz import corpus, tracer
+from cobrafuzz import state as st, tracer
 
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 logging.getLogger().setLevel(logging.DEBUG)
 
 MPContext = Union[mp.context.ForkContext, mp.context.ForkServerContext, mp.context.SpawnContext]
 MPProcess = Union[mp.context.ForkProcess, mp.context.ForkServerProcess, mp.context.SpawnProcess]
-
-
-class Coverage:
-    def __init__(self) -> None:
-        self._covered: set[tuple[Optional[str], Optional[int], str, int]] = set()
-
-    def store_and_check_improvement(
-        self,
-        data: set[tuple[Optional[str], Optional[int], str, int]],
-    ) -> bool:
-        covered = len(self._covered)
-        self._covered |= data
-        if len(self._covered) > covered:
-            return True
-        return False
-
-    @property
-    def total(self) -> int:
-        return len(self._covered)
 
 
 @dataclass
@@ -89,9 +70,8 @@ def worker(  # noqa: PLR0913
     result_queue: mp.Queue[Status],
     close_stdout: bool,
     close_stderr: bool,
-    max_input_size: int,
     stat_frequency: int,
-    seeds: list[Path],
+    state: st.State,
 ) -> None:
     class NullFile(io.StringIO):
         """No-op to trash stdout away."""
@@ -109,9 +89,6 @@ def worker(  # noqa: PLR0913
 
     runs = 0
     last_status = time.time()
-    corp = corpus.Corpus(seeds=seeds, max_input_size=max_input_size)
-    cov = Coverage()
-
     target = cast(Callable[[bytes], None], pickle.loads(target_bytes))  # noqa: S301
 
     tracer.initialize()
@@ -121,11 +98,11 @@ def worker(  # noqa: PLR0913
 
         while not update_queue.empty():
             update = update_queue.get()
-            cov.store_and_check_improvement(update.covered)
-            corp.put(bytearray(update.data))
+            state.store_coverage(update.covered)
+            state.put_input(bytearray(update.data))
 
         runs += 1
-        data = corp.generate_input()
+        data = state.get_input()
 
         try:
             target(data)
@@ -134,7 +111,7 @@ def worker(  # noqa: PLR0913
             runs = 0
             last_status = time.time()
         else:
-            new_path = cov.store_and_check_improvement(data=tracer.get_covered())
+            new_path = state.store_coverage(data=tracer.get_covered())
             if new_path:
                 result_queue.put(
                     Report(wid=wid, runs=runs, data=data, covered=tracer.get_covered()),
@@ -163,6 +140,7 @@ class Fuzzer:
         regression: bool = False,
         seeds: Optional[list[Path]] = None,
         start_method: Optional[str] = None,
+        state_file: Optional[Path] = None,
     ):
         """
         Fuzz-test target and store crash artifacts into crash_dir.
@@ -186,6 +164,8 @@ class Fuzzer:
         start_method:   Multiprocessing start method to use (spawn, forkserver or fork).
                         Defaults to "spawn". Do not use "fork" as it is unreliable and may lead
                         to deadlocks.
+        state_file:     File to load state from. Will be updated periodically. If no file is
+                        specified, the state will be held in memory and discarded on exit.
         """
 
         self._current_crashes = 0
@@ -216,6 +196,7 @@ class Fuzzer:
         self._max_time = max_time
         self._num_workers: int = num_workers or self._mp_ctx.cpu_count() - 1
         self._seeds = seeds or []
+        self._state_file = state_file
 
         if regression:
             for error_file in crash_dir.glob("*"):
@@ -269,7 +250,7 @@ class Fuzzer:
         if len(buf) < 200:
             logging.info("sample = %s", buf.hex())
 
-    def _initialize_process(self, wid: int) -> tuple[MPProcess, mp.Queue[Update]]:
+    def _initialize_process(self, wid: int, state: st.State) -> tuple[MPProcess, mp.Queue[Update]]:
         queue: mp.Queue[Update] = self._mp_ctx.Queue()
         result = self._mp_ctx.Process(
             target=worker,
@@ -280,9 +261,8 @@ class Fuzzer:
                 self._result_queue,
                 self._close_stdout,
                 self._close_stderr,
-                self._max_input_size,
                 self._stat_frequency,
-                self._seeds,
+                state,
             ),
         )
         result.start()
@@ -290,16 +270,20 @@ class Fuzzer:
 
     def start(self) -> None:  # noqa: PLR0912
         start_time = time.time()
-        coverage = Coverage()
-        corp = corpus.Corpus(self._seeds, self._max_input_size)
+        state = st.State(self._seeds, self._max_input_size)
 
-        self._workers = [self._initialize_process(wid) for wid in range(self._num_workers)]
+        if self._state_file:
+            state.load(self._state_file)
+
+        self._workers = [
+            self._initialize_process(wid=wid, state=state) for wid in range(self._num_workers)
+        ]
 
         logging.info(
             "#0 READ units: %d workers: %d seeds: %d",
-            corp.length,
+            state.size,
             self._num_workers,
-            corp.length,
+            len(self._seeds),
         )
 
         while True:
@@ -327,16 +311,19 @@ class Fuzzer:
                 self._current_runs += result.runs
 
                 if isinstance(result, Error):
-                    improvement = coverage.store_and_check_improvement(result.covered)
+                    improvement = state.store_coverage(result.covered)
                     if improvement:
                         self._current_crashes += 1
                         self._write_sample(result.data)
 
                 elif isinstance(result, Report):
-                    improvement = coverage.store_and_check_improvement(result.covered)
+                    improvement = state.store_coverage(result.covered)
                     if improvement:
-                        self._log_stats("NEW", coverage.total, corp.length)
-                        corp.put(bytearray(result.data))
+                        self._log_stats("NEW", state.total_coverage, state.size)
+                        state.put_input(bytearray(result.data))
+
+                        if self._state_file:
+                            state.save(self._state_file)
 
                         for wid, (_, queue) in enumerate(self._workers):
                             if wid != result.wid:
@@ -349,7 +336,7 @@ class Fuzzer:
                     assert False, f"Unhandled result type: {type(result)}"
 
             if (time.time() - self._last_stats_time) > self._stat_frequency:
-                self._log_stats("PULSE", coverage.total, corp.length)
+                self._log_stats("PULSE", state.total_coverage, state.size)
 
         for _, queue in self._workers:
             queue.cancel_join_thread()

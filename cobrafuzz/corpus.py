@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import hashlib
 import secrets
 import struct
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 from . import util
@@ -207,49 +205,3 @@ def mutate(buf: bytearray, max_input_size: Optional[int] = None) -> bytearray:
     if max_input_size and len(res) > max_input_size:
         res = res[:max_input_size]
     return res
-
-
-class Corpus:
-    def __init__(
-        self,
-        seeds: Optional[list[Path]] = None,
-        max_input_size: int = 4096,
-        save_dir: Optional[Path] = None,
-    ):
-        self._max_input_size = max_input_size
-        self._save_dir = save_dir
-        self._seeds = seeds or []
-
-        self._inputs: list[bytearray] = []
-        for path in [p for p in self._seeds if p.is_file()] + [
-            f for p in self._seeds if not p.is_file() for f in p.glob("*") if f.is_file()
-        ]:
-            with path.open("rb") as f:
-                self._inputs.append(bytearray(f.read()))
-        if not self._inputs:
-            self._inputs.append(bytearray(0))
-
-    @property
-    def length(self) -> int:
-        return len(self._inputs)
-
-    def put(self, buf: bytearray) -> None:
-        self._inputs.append(buf)
-
-    def save(self) -> None:
-        if not self._save_dir:
-            return
-
-        if not self._save_dir.exists():
-            self._save_dir.mkdir()
-
-        for buf in self._inputs:
-            fname = self._save_dir / hashlib.sha256(buf).hexdigest()
-            with fname.open("wb") as f:
-                f.write(buf)
-
-    def generate_input(self) -> bytearray:
-        return mutate(
-            buf=self._inputs[util.rand(len(self._inputs))],
-            max_input_size=self._max_input_size,
-        )

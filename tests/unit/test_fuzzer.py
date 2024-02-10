@@ -65,3 +65,17 @@ def test_regression(tmp_path: Path) -> None:
     (tmp_path / "subdir").mkdir()
     with pytest.raises(SystemExit, match="^0$"):
         fuzzer.Fuzzer(target=crashing_target, crash_dir=tmp_path, regression=True)
+
+
+def test_state(tmp_path: Path) -> None:
+    state_file = tmp_path / "state.json"
+    for _ in range(2):
+        f = fuzzer.Fuzzer(
+            target=non_crashing_target,
+            crash_dir=tmp_path,
+            max_runs=10,
+            state_file=state_file,
+        )
+        with pytest.raises(SystemExit, match="^0$"):
+            f.start()
+        assert state_file.exists()
