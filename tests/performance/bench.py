@@ -4,7 +4,7 @@ import argparse
 import logging
 import time
 
-from cobrafuzz.corpus import mutate
+from cobrafuzz.mutator import mutate
 
 
 def _mutate(rounds: int) -> None:

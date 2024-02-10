@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from cobrafuzz import corpus, util
+from cobrafuzz import mutator, util
 
 
 class LoadError(Exception):
@@ -109,7 +109,7 @@ class State:
         self._inputs.append(buf)
 
     def get_input(self) -> bytearray:
-        return corpus.mutate(
+        return mutator.mutate(
             buf=list(self._inputs)[util.rand(len(self._inputs))],
             max_input_size=self._max_input_size,
         )

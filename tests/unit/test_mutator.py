@@ -4,7 +4,7 @@ import secrets
 
 import pytest
 
-from cobrafuzz import corpus, util
+from cobrafuzz import mutator, util
 
 
 def test_mutate(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -15,13 +15,13 @@ def test_mutate(monkeypatch: pytest.MonkeyPatch) -> None:
         mp.setattr(
             secrets,
             "choice",
-            lambda _: corpus._mutate_insert_range_of_bytes,  # noqa: SLF001
+            lambda _: mutator._mutate_insert_range_of_bytes,  # noqa: SLF001
         )
-        assert corpus.mutate(bytearray(b"0123456789")) == bytearray(b"01234insertedinserted56789")
+        assert mutator.mutate(bytearray(b"0123456789")) == bytearray(b"01234insertedinserted56789")
 
 
 def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
-    def modify(res: bytearray, _: corpus.Config) -> bool:
+    def modify(res: bytearray, _: mutator.Config) -> bool:
         if res[0] != 0:
             res[0] = 0
             return False
@@ -30,20 +30,20 @@ def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as mp:
         mp.setattr(util, "rand_exp", lambda: 2)
         mp.setattr(secrets, "choice", lambda _, _c=None: modify)
-        assert corpus.mutate(bytearray(b"0123456789")) == bytearray(b"\x00123456789")
+        assert mutator.mutate(bytearray(b"0123456789")) == bytearray(b"\x00123456789")
 
 
 def test_mutate_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as mp:
         mp.setattr(util, "rand_exp", lambda: 1)
         mp.setattr(secrets, "choice", lambda _: lambda x, _: x)
-        assert corpus.mutate(bytearray(b"0123456789"), max_input_size=4) == bytearray(b"0123")
+        assert mutator.mutate(bytearray(b"0123456789"), max_input_size=4) == bytearray(b"0123")
 
 
 def test_mutate_remove_range_of_bytes_fail() -> None:
     res = bytearray()
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_remove_range_of_bytes(res)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_remove_range_of_bytes(res)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -64,7 +64,7 @@ def test_mutate_remove_range_of_bytes_success(
     with monkeypatch.context() as mp:
         mp.setattr(util, "rand", lambda _: start)
         mp.setattr(util, "choose_len", lambda _: length)
-        corpus._mutate_remove_range_of_bytes(tmp)  # noqa: SLF001
+        mutator._mutate_remove_range_of_bytes(tmp)  # noqa: SLF001
         assert tmp == expected
 
 
@@ -89,17 +89,17 @@ def test_mutate_insert_range_of_bytes_success(
         mp.setattr(secrets, "token_bytes", lambda n: n * b"X")
         mp.setattr(util, "rand", lambda _: start)
         mp.setattr(util, "choose_len", lambda _: length)
-        corpus._mutate_insert_range_of_bytes(  # noqa: SLF001
+        mutator._mutate_insert_range_of_bytes(  # noqa: SLF001
             tmp,
-            corpus.Config(max_random_bytes=10),
+            mutator.Config(max_random_bytes=10),
         )
         assert tmp == expected
 
 
 def test_mutate_duplicate_range_of_bytes_fail() -> None:
     data = bytearray(b"")
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_duplicate_range_of_bytes(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_duplicate_range_of_bytes(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -136,14 +136,14 @@ def test_mutate_duplicate_range_of_bytes_success(
 
         mp.setattr(util, "rand", rand)
         mp.setattr(util, "choose_len", lambda _: length)
-        corpus._mutate_duplicate_range_of_bytes(tmp)  # noqa: SLF001
+        mutator._mutate_duplicate_range_of_bytes(tmp)  # noqa: SLF001
         assert tmp == expected
 
 
 def test_mutate_copy_range_of_bytes_fail() -> None:
     data = bytearray(b"")
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_copy_range_of_bytes(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_copy_range_of_bytes(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -179,14 +179,14 @@ def test_mutate_copy_range_of_bytes_success(
 
         mp.setattr(util, "rand", rand)
         mp.setattr(util, "choose_len", lambda _: length)
-        corpus._mutate_copy_range_of_bytes(tmp)  # noqa: SLF001
+        mutator._mutate_copy_range_of_bytes(tmp)  # noqa: SLF001
         assert tmp == expected
 
 
 def test_mutate_bit_flip_fail() -> None:
     data = bytearray(b"")
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_bit_flip(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_bit_flip(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -212,14 +212,14 @@ def test_mutate_bit_flip_success(
 
     with monkeypatch.context() as mp:
         mp.setattr(util, "rand", lambda n: bit if n == 8 else byte)
-        corpus._mutate_bit_flip(tmp)  # noqa: SLF001
+        mutator._mutate_bit_flip(tmp)  # noqa: SLF001
         assert tmp == expected
 
 
 def test_mutate_flip_random_bits_of_random_byte_fail() -> None:
     data = bytearray(b"")
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_flip_random_bits_of_random_byte(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_flip_random_bits_of_random_byte(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -244,14 +244,14 @@ def test_mutate_flip_random_bits_of_random_byte_success(
 
     with monkeypatch.context() as mp:
         mp.setattr(util, "rand", lambda n: value if n == 255 else byte)
-        corpus._mutate_flip_random_bits_of_random_byte(tmp)  # noqa: SLF001
+        mutator._mutate_flip_random_bits_of_random_byte(tmp)  # noqa: SLF001
         assert tmp == expected
 
 
 def test_mutate_swap_two_bytes_fail() -> None:
     data = bytearray(b"")
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_swap_two_bytes(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_swap_two_bytes(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -287,14 +287,14 @@ def test_mutate_swap_two_bytes(
         rand.second = None  # type: ignore[attr-defined]
 
         mp.setattr(util, "rand", rand)
-        corpus._mutate_swap_two_bytes(tmp)  # noqa: SLF001
+        mutator._mutate_swap_two_bytes(tmp)  # noqa: SLF001
         assert tmp == expected
 
 
 def test_mutate_add_subtract_from_a_byte_fail() -> None:
     data = bytearray(b"")
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_add_subtract_from_a_byte(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_add_subtract_from_a_byte(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -323,14 +323,14 @@ def test_mutate_add_subtract_from_a_byte_success(
 
     with monkeypatch.context() as mp:
         mp.setattr(util, "rand", lambda n: value if n == 2**8 else position)
-        corpus._mutate_add_subtract_from_a_byte(tmp)  # noqa: SLF001
+        mutator._mutate_add_subtract_from_a_byte(tmp)  # noqa: SLF001
         assert tmp == expected
 
 
 def test_mutate_add_subtract_from_a_uint16_fail() -> None:
     data = bytearray(b"")
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_add_subtract_from_a_uint16(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_add_subtract_from_a_uint16(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -358,14 +358,14 @@ def test_mutate_add_subtract_from_a_uint16_success(
     with monkeypatch.context() as mp:
         mp.setattr(util, "rand", lambda n: value if n == 2**16 else position)
         mp.setattr(util, "rand_bool", lambda: not little_endian)
-        corpus._mutate_add_subtract_from_a_uint16(tmp)  # noqa: SLF001
+        mutator._mutate_add_subtract_from_a_uint16(tmp)  # noqa: SLF001
         assert tmp == expected
 
 
 def test_mutate_add_subtract_from_a_uint32_fail() -> None:
     data = bytearray(b"")
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_add_subtract_from_a_uint32(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_add_subtract_from_a_uint32(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -393,14 +393,14 @@ def test_mutate_add_subtract_from_a_uint32_success(
     with monkeypatch.context() as mp:
         mp.setattr(util, "rand", lambda n: value if n == 2**32 else position)
         mp.setattr(util, "rand_bool", lambda: not little_endian)
-        corpus._mutate_add_subtract_from_a_uint32(tmp)  # noqa: SLF001
+        mutator._mutate_add_subtract_from_a_uint32(tmp)  # noqa: SLF001
         assert tmp == expected
 
 
 def test_mutate_add_subtract_from_a_uint64_fail() -> None:
     data = bytearray(b"")
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_add_subtract_from_a_uint64(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_add_subtract_from_a_uint64(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -428,14 +428,14 @@ def test_mutate_add_subtract_from_a_uint64_success(
     with monkeypatch.context() as mp:
         mp.setattr(util, "rand", lambda n: value if n == 2**64 else position)
         mp.setattr(util, "rand_bool", lambda: not little_endian)
-        corpus._mutate_add_subtract_from_a_uint64(tmp)  # noqa: SLF001
+        mutator._mutate_add_subtract_from_a_uint64(tmp)  # noqa: SLF001
         assert tmp == expected
 
 
 def test_mutate_replace_a_byte_with_an_interesting_value_fail() -> None:
     data = bytearray(b"")
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_replace_a_byte_with_an_interesting_value(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_replace_a_byte_with_an_interesting_value(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -460,15 +460,15 @@ def test_mutate_replace_a_byte_with_an_interesting_value_success(
 
     with monkeypatch.context() as mp:
         mp.setattr(util, "rand", lambda _: position)
-        mp.setattr(corpus, "INTERESTING8", [value])
-        corpus._mutate_replace_a_byte_with_an_interesting_value(tmp)  # noqa: SLF001
+        mp.setattr(mutator, "INTERESTING8", [value])
+        mutator._mutate_replace_a_byte_with_an_interesting_value(tmp)  # noqa: SLF001
         assert tmp == expected
 
 
 def test_mutate_replace_an_uint16_with_an_interesting_value_fail() -> None:
     data = bytearray(b"")
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_replace_an_uint16_with_an_interesting_value(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_replace_an_uint16_with_an_interesting_value(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -494,16 +494,16 @@ def test_mutate_replace_an_uint16_with_an_interesting_value_success(
 
     with monkeypatch.context() as mp:
         mp.setattr(util, "rand", lambda _: position)
-        mp.setattr(corpus, "INTERESTING16", [value])
+        mp.setattr(mutator, "INTERESTING16", [value])
         mp.setattr(util, "rand_bool", lambda: not little_endian)
-        corpus._mutate_replace_an_uint16_with_an_interesting_value(tmp)  # noqa: SLF001
+        mutator._mutate_replace_an_uint16_with_an_interesting_value(tmp)  # noqa: SLF001
         assert tmp == expected
 
 
 def test_mutate_replace_an_uint32_with_an_interesting_value_fail() -> None:
     data = bytearray(b"")
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_replace_an_uint32_with_an_interesting_value(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_replace_an_uint32_with_an_interesting_value(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -529,16 +529,16 @@ def test_mutate_replace_an_uint32_with_an_interesting_value_success(
 
     with monkeypatch.context() as mp:
         mp.setattr(util, "rand", lambda _: position)
-        mp.setattr(corpus, "INTERESTING32", [value])
+        mp.setattr(mutator, "INTERESTING32", [value])
         mp.setattr(util, "rand_bool", lambda: not little_endian)
-        corpus._mutate_replace_an_uint32_with_an_interesting_value(tmp)  # noqa: SLF001
+        mutator._mutate_replace_an_uint32_with_an_interesting_value(tmp)  # noqa: SLF001
         assert tmp == expected
 
 
 def test_mutate_replace_an_ascii_digit_with_another_digit_fail() -> None:
     data = bytearray(b"no digits present")
-    with pytest.raises(corpus.OutOfDataError):
-        corpus._mutate_replace_an_ascii_digit_with_another_digit(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_replace_an_ascii_digit_with_another_digit(data)  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -562,6 +562,6 @@ def test_mutate_replace_an_ascii_digit_with_another_digit_success(
 
     with monkeypatch.context() as mp:
         mp.setattr(secrets, "choice", lambda d: (position, tmp[position]) if len(d) > 1 else d[0])
-        mp.setattr(corpus, "DIGITS", {ord("0") + value})
-        corpus._mutate_replace_an_ascii_digit_with_another_digit(tmp)  # noqa: SLF001
+        mp.setattr(mutator, "DIGITS", {ord("0") + value})
+        mutator._mutate_replace_an_ascii_digit_with_another_digit(tmp)  # noqa: SLF001
         assert tmp == expected
