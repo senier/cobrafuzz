@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Saving fuzzer state to file (#15)
+- Loading crash coverage from crash dir on startup (#25)
 
 ## [2.1.0] - 2024-02-10
 
