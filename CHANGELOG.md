@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Potential deadlocks due to use of "fork" start method
 
+### Removed
+
+- Fixed artifact name (#27)
+
+
 ## [2.0.0] - 2024-02-05
 
 ### Added
