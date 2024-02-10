@@ -125,7 +125,7 @@ def worker(  # noqa: PLR0913
 
 
 class Fuzzer:
-    def __init__(  # noqa: PLR0913, ref:#2
+    def __init__(  # noqa: PLR0913
         self,
         crash_dir: Path,
         target: Callable[[bytes], None],
