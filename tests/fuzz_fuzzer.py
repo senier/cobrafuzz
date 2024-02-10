@@ -1,7 +1,7 @@
 #!/usr/bin/env -S python3 -O
 
-from cobrafuzz.corpus import Corpus
 from cobrafuzz.main import CobraFuzz
+from cobrafuzz.mutator import Corpus
 
 CORPUS = Corpus()
 

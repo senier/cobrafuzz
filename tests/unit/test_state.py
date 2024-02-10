@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from cobrafuzz import corpus, state, util
+from cobrafuzz import mutator, state, util
 
 
 def test_length() -> None:
@@ -64,7 +64,7 @@ def test_generate_input(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
         f.write(b"deadbeef")
     c = state.State(seeds=[filename])
     with monkeypatch.context() as mp:
-        mp.setattr(corpus, "mutate", lambda buf, max_input_size: buf[:max_input_size])
+        mp.setattr(mutator, "mutate", lambda buf, max_input_size: buf[:max_input_size])
         mp.setattr(util, "rand", lambda _: 0)
         assert c.get_input() == bytearray(b"deadbeef")
         assert c.get_input() == bytearray(b"deadbeef")
