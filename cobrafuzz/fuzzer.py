@@ -8,12 +8,17 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Union, cast
+
+import dill as pickle  # type: ignore[import-untyped]
 
 from cobrafuzz import corpus, tracer
 
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 logging.getLogger().setLevel(logging.DEBUG)
+
+MPContext = Union[mp.context.ForkContext, mp.context.ForkServerContext, mp.context.SpawnContext]
+MPProcess = Union[mp.context.ForkProcess, mp.context.ForkServerProcess, mp.context.SpawnProcess]
 
 
 class Coverage:
@@ -79,7 +84,7 @@ def covered(e: Exception) -> set[tuple[Optional[str], Optional[int], str, int]]:
 
 def worker(  # noqa: PLR0913
     wid: int,
-    target: Callable[[bytes], None],
+    target_bytes: bytes,
     update_queue: mp.Queue[Update],
     result_queue: mp.Queue[Status],
     close_stdout: bool,
@@ -106,6 +111,8 @@ def worker(  # noqa: PLR0913
     last_status = time.time()
     corp = corpus.Corpus(seeds=seeds, max_input_size=max_input_size)
     cov = Coverage()
+
+    target = cast(Callable[[bytes], None], pickle.loads(target_bytes))  # noqa: S301
 
     tracer.initialize()
 
@@ -156,6 +163,7 @@ class Fuzzer:
         num_workers: Optional[int] = 1,
         regression: bool = False,
         seeds: Optional[list[Path]] = None,
+        start_method: Optional[str] = None,
     ):
         """
         Fuzz-test target and store crash artifacts into crash_dir.
@@ -178,18 +186,29 @@ class Fuzzer:
                         Use None to spawn one fewer than CPUs available.
         regression:     Execute target on all samples found in crash_dir, print errors and exit.
         seeds:          List of files and directories to seed the fuzzer with.
+        start_method:   Multiprocessing start method to use (spawn, forkserver or fork).
+                        Defaults to "spawn". Do not use "fork" as it is unreliable and may lead
+                        to deadlocks.
         """
 
         self._current_crashes = 0
         self._current_runs = 0
         self._last_runs = 0
         self._last_stats_time = time.time()
-        self._mp_ctx: mp.context.ForkContext = mp.get_context("fork")
+
+        self._mp_ctx: MPContext = (
+            mp.get_context("fork")
+            if start_method == "fork"
+            else mp.get_context("forkserver")
+            if start_method == "forkserver"
+            else mp.get_context("spawn")
+        )
+
         self._result_queue: mp.Queue[Result] = self._mp_ctx.Queue()
-        self._workers: list[tuple[mp.context.ForkProcess, mp.Queue[Update]]] = []
+        self._workers: list[tuple[MPProcess, mp.Queue[Update]]] = []
 
         self._crash_dir = crash_dir
-        self._target = target
+        self._target = pickle.dumps(target)
 
         self._artifact_name = artifact_name
         self._close_stderr = close_stderr
@@ -254,7 +273,7 @@ class Fuzzer:
         if len(buf) < 200:
             logging.info("sample = %s", buf.hex())
 
-    def _initialize_process(self, wid: int) -> tuple[mp.context.ForkProcess, mp.Queue[Update]]:
+    def _initialize_process(self, wid: int) -> tuple[MPProcess, mp.Queue[Update]]:
         queue: mp.Queue[Update] = self._mp_ctx.Queue()
         result = self._mp_ctx.Process(
             target=worker,
@@ -289,8 +308,6 @@ class Fuzzer:
 
         while True:
             if self._max_runs is not None and self._current_runs >= self._max_runs:
-                for p, _ in self._workers:
-                    p.terminate()
                 logging.info(
                     "Performed %d runs (%d/s), stopping.",
                     self._max_runs,
@@ -299,8 +316,6 @@ class Fuzzer:
                 break
 
             if self._max_time is not None and (time.time() - start_time) > self._max_time:
-                for p, _ in self._workers:
-                    p.terminate()
                 logging.info(
                     "Timeout after %d seconds, stopping.",
                     self._max_time,
@@ -308,8 +323,6 @@ class Fuzzer:
                 break
 
             if self._max_crashes is not None and self._current_crashes >= self._max_crashes:
-                for p, _ in self._workers:
-                    p.terminate()
                 logging.info("Found %d crashes, stopping.", self._current_crashes)
                 break
 
@@ -345,6 +358,9 @@ class Fuzzer:
         for _, queue in self._workers:
             queue.cancel_join_thread()
         self._result_queue.cancel_join_thread()
+
+        for p, _ in self._workers:
+            p.terminate()
 
         for p, _ in self._workers:
             p.join()

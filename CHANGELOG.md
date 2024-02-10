@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Python 3.8 support
+- Support for "spawn" and "forkserver" start methods
+
+### Fixed
+
+- Potential deadlocks due to use of "fork" start method
 
 ## [2.0.0] - 2024-02-05
 
