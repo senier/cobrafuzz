@@ -27,6 +27,7 @@ class State:
         self._covered: set[tuple[Optional[str], Optional[int], str, int]] = set()
         self._inputs: list[bytearray] = []
         self._file = file
+        self._mutator = mutator.Mutator(max_input_size=max_input_size)
 
         for path in [p for p in seeds if p.is_file()] + [
             f for p in seeds if p.is_dir() for f in p.glob("*") if f.is_file()
@@ -109,7 +110,6 @@ class State:
         self._inputs.append(buf)
 
     def get_input(self) -> bytearray:
-        return mutator.mutate(
+        return self._mutator.mutate(
             buf=list(self._inputs)[util.rand(len(self._inputs))],
-            max_input_size=self._max_input_size,
         )
