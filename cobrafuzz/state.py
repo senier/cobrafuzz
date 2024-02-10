@@ -54,9 +54,7 @@ class State:
                         f"Invalid version in state file {self._file} (expected {self._VERSION})",
                     )
                 self._covered |= {tuple(e) for e in data["coverage"]}
-                self._inputs.extend(
-                    bytearray(ast.literal_eval(f"b'{i}'")) for i in data["population"]
-                )
+                self._inputs.extend(bytearray(ast.literal_eval(i)) for i in data["population"])
         except FileNotFoundError:
             pass
         except (json.JSONDecodeError, TypeError):
@@ -74,7 +72,7 @@ class State:
                 obj={
                     "version": self._VERSION,
                     "coverage": list(self._covered),
-                    "population": [str(bytes(i))[2:-1] for i in self._inputs],
+                    "population": [str(bytes(i)) for i in self._inputs],
                 },
                 fp=sf,
                 ensure_ascii=True,
