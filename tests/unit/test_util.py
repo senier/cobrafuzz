@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 import pytest
 from scipy.stats import chisquare
@@ -150,3 +152,54 @@ def test_choose_length() -> None:
 
     result = chisquare(f_obs=data, f_exp=expected)
     assert result.pvalue > 0.05, result
+
+
+def test_adaptive_rand_invalid_bounds() -> None:
+    with pytest.raises(
+        util.OutOfBoundsError,
+        match=r"^Lower bound must be lower than upper bound \(10 > 0\)$",
+    ):
+        util.AdaptiveRand(lower=10, upper=0)
+
+
+def test_adaptive_rand_invalid_update_without_sample() -> None:
+    r = util.AdaptiveRand(lower=0, upper=10)
+    with pytest.raises(
+        util.OutOfBoundsError,
+        match=r"^Update without previous sample$",
+    ):
+        r.update(1.0)
+
+
+def test_adaptive_rand_in_range() -> None:
+    for _ in range(1, 1000):
+        lower = random.randint(0, 1000)  # noqa: S311
+        upper = random.randint(lower, 1000)  # noqa: S311
+        r = util.AdaptiveRand(lower=lower, upper=upper)
+        sample = r.sample()
+        assert lower <= sample <= upper
+
+
+def test_adaptive_rand_uniform() -> None:
+    r = util.AdaptiveRand(lower=0, upper=1000)
+    data = [r.sample() for _ in range(1, 100000)]
+    result = chisquare(f_obs=list(np.bincount(data)))
+    assert result.pvalue > 0.05
+
+
+def test_adaptive_rand_update() -> None:
+    r = util.AdaptiveRand(lower=0, upper=10)
+    for _ in range(100000):
+        value = r.sample()
+        r.update(0.9 if value <= 5 else 1.1)
+    data = [r.sample() for _ in range(1, 100000)]
+    assert all(d > 5 for d in data)
+
+
+def test_adaptive_choice_update() -> None:
+    r = util.AdaptiveChoice(population=["a", "b", "c"])
+    for _ in range(100000):
+        value = r.sample()
+        r.update(0.9 if value == "a" else 1.1)
+    data = [r.sample() for _ in range(1, 100000)]
+    assert all(d != "a" for d in data)
