@@ -1,11 +1,45 @@
 from __future__ import annotations
 
+import random
 from secrets import choice, randbelow, randbits
-from typing import Optional
+from typing import Generic, Optional, TypeVar
 
 
 class OutOfBoundsError(Exception):
     pass
+
+
+PopulationType = TypeVar("PopulationType")
+
+
+class AdaptiveChoice(Generic[PopulationType]):
+    def __init__(self, population: list[PopulationType]) -> None:
+        self._population = population
+        self._distribution = [1.0 for _ in self._population]
+        self._last: Optional[PopulationType] = None
+
+    def _normalize_distribution(self) -> None:
+        total = sum(self._distribution)
+        self._distribution = [p / total for p in self._distribution]
+
+    def sample(self) -> PopulationType:
+        self._last = random.choices(self._population, self._distribution, k=1)[0]  # noqa: S311
+        return self._last
+
+    def update(self, adapt: float) -> None:
+        if self._last is None:
+            raise OutOfBoundsError("Update without previous sample")
+        self._distribution[self._population.index(self._last)] *= adapt
+        self._normalize_distribution()
+
+
+class AdaptiveRand(AdaptiveChoice[int]):
+    def __init__(self, lower: int, upper: int) -> None:
+        if lower > upper:
+            raise OutOfBoundsError(
+                f"Lower bound must be lower than upper bound ({lower} > {upper})",
+            )
+        super().__init__(list(range(lower, upper + 1)))
 
 
 def rand(n: int) -> int:
