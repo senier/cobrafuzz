@@ -45,7 +45,7 @@ class Report(Result):
 
 @dataclass
 class Error(Report):
-    pass
+    message: str
 
 
 def covered(e: Exception) -> set[tuple[Optional[str], Optional[int], str, int]]:
@@ -107,7 +107,15 @@ def worker(  # noqa: PLR0913
         try:
             target(data)
         except Exception as e:  # noqa: BLE001
-            result_queue.put(Error(wid=wid, runs=runs, data=data, covered=covered(e)))
+            result_queue.put(
+                Error(
+                    wid=wid,
+                    runs=runs,
+                    data=data,
+                    covered=covered(e),
+                    message=f"{e.__class__.__name__}: {e}",
+                ),
+            )
             runs = 0
             last_status = time.time()
         else:
@@ -326,6 +334,7 @@ class Fuzzer:
                 if isinstance(result, Error):
                     improvement = self._state.store_coverage(result.covered)
                     if improvement:
+                        logging.info(result.message)
                         self._current_crashes += 1
                         self._write_sample(result.data)
 
