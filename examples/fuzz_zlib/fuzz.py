@@ -1,19 +1,15 @@
 # mypy: disable-error-code="attr-defined"
 
-import aifc
-import io
-
 from cobrafuzz.main import CobraFuzz
 
 
 @CobraFuzz
 def fuzz(buf: bytes) -> None:
-    try:
-        f = io.BytesIO(buf)
-        a = aifc.open(f)
-        a.readframes(1)
-    except (EOFError, aifc.Error):
-        pass
+    import contextlib
+    import zlib
+
+    with contextlib.suppress(zlib.error):
+        zlib.decompress(buf)
 
 
 if __name__ == "__main__":

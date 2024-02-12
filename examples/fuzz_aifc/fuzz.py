@@ -1,15 +1,18 @@
 # mypy: disable-error-code="attr-defined"
-import codeop
 
 from cobrafuzz.main import CobraFuzz
 
 
 @CobraFuzz
 def fuzz(buf: bytes) -> None:
+    import aifc
+    import io
+
     try:
-        string = buf.decode("utf-8")
-        codeop.compile_command(string)
-    except (UnicodeDecodeError, ValueError, SyntaxError):
+        f = io.BytesIO(buf)
+        a = aifc.open(f)
+        a.readframes(1)
+    except (EOFError, aifc.Error):
         pass
 
 
