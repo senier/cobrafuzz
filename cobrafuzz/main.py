@@ -70,6 +70,11 @@ class CobraFuzz:
             default="spawn",
             help="Start method to be used for multiprocessing (default: %(default)s).",
         )
+        parser.add_argument(
+            "--state-file",
+            type=Path,
+            help="File to periodically store fuzzer state to.",
+        )
 
         parser.add_argument(
             "seeds",
@@ -92,5 +97,6 @@ class CobraFuzz:
             regression=args.regression,
             seeds=args.seeds,
             start_method=args.start_method,
+            state_file=args.state_file,
         )
         f.start()
