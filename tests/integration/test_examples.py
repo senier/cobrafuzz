@@ -9,7 +9,7 @@ import pytest
     "test",
     [
         "aifc",
-        "beautifulsoup",
+        "bs",
         "codeop",
         "furl",
         "htmlparser",
@@ -27,6 +27,6 @@ def test_example(
 ) -> None:
     with monkeypatch.context() as mp:
         mp.setattr(sys, "argv", ["fuzz", "--crash-dir", str(tmp_path), "--max-runs", "100"])
-        fuzz = importlib.import_module(f"examples.{test}.fuzz")
+        fuzz = importlib.import_module(f"examples.fuzz_{test}.fuzz")
         with pytest.raises(SystemExit, match="^0$"):
             fuzz.fuzz()

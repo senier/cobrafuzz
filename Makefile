@@ -38,6 +38,16 @@ format:
 	ruff check --fix-only $(PYTHON_PACKAGES) | true
 	black $(PYTHON_PACKAGES)
 
+fuzz-%:
+	python examples/fuzz_$*/fuzz.py --crash-dir examples/fuzz_$*/crashes --state examples/fuzz_$*/state.json --close-stdout --close-stderr examples/fuzz_$*/seeds
+
+regr-%:
+	@python examples/fuzz_$*/fuzz.py --crash-dir examples/fuzz_$*/crashes --regression
+
+clean-%:
+	@rm -f examples/fuzz_$*/state.json
+	@rm -f examples/fuzz_$*/crashes/*
+
 clean:
 	rm -rf dist cobrafuzz.egg-info crashes .devel_installed .ruff_cache build
 

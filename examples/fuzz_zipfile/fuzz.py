@@ -1,13 +1,13 @@
 # mypy: disable-error-code="attr-defined"
 
-import io
-import zipfile
-
 from cobrafuzz.main import CobraFuzz
 
 
 @CobraFuzz
 def fuzz(buf: bytes) -> None:
+    import io
+    import zipfile
+
     f = io.BytesIO(buf)
     try:
         z = zipfile.ZipFile(f)

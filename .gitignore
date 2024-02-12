@@ -7,7 +7,8 @@ build/
 /.venv
 /.devel_installed
 /cobrafuzz.egg-info
-/crashes
 /.coverage
 /.coverage.*
 /coverage.xml
+crashes
+state.json

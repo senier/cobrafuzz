@@ -1,13 +1,13 @@
-# mypy: disable-error-code="attr-defined"
-import isort
 from cobrafuzz.main import CobraFuzz
 
 
 @CobraFuzz
 def fuzz(buf: bytes) -> None:
+    from html.parser import HTMLParser
+
     try:
-        string = buf.decode("ascii")
-        isort.code(string)
+        parser = HTMLParser()
+        parser.feed(buf.decode("ascii"))
     except UnicodeDecodeError:
         pass
 
