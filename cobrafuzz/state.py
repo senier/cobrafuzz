@@ -26,14 +26,15 @@ class State:
         self._max_input_size = max_input_size
         self._covered: set[tuple[Optional[str], Optional[int], str, int]] = set()
         self._inputs: list[bytearray] = []
-        self._num_seeds = len(seeds)
         self._file = file
 
         for path in [p for p in seeds if p.is_file()] + [
-            f for p in seeds if not p.is_file() for f in p.glob("*") if f.is_file()
+            f for p in seeds if p.is_dir() for f in p.glob("*") if f.is_file()
         ]:
             with path.open("rb") as f:
                 self._inputs.append(bytearray(f.read()))
+
+        self._num_seeds = len(self._inputs)
         if not self._inputs:
             self._inputs.append(bytearray(0))
         self._load()
