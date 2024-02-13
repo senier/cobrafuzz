@@ -105,7 +105,7 @@ def worker(  # noqa: PLR0913
         data = state.get_input()
 
         try:
-            target(data)
+            target(bytes(data))
         except Exception as e:  # noqa: BLE001
             result_queue.put(
                 Error(
