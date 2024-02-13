@@ -1,0 +1,22 @@
+package Enumeration_Type is
+
+   type Day is
+      (Mon => 1,
+       Tue => 2,
+       Wed => 3,
+       Thu => 4,
+       Fri => 5,
+       Sat => 6,
+       Sun => 7)
+   with Size => 3;
+
+   type Protocol is (P1 => 1, P2 => 2) with Size => 3, Always_Valid => True;
+   type Gender is (M, F) with Size => 1, Always_Valid => False;
+
+   type Priority is
+      (Low    => 1,
+       Medium => 4,
+       High   => 7)
+   with Always_Valid, Size => 8;
+
+end Enumeration_Type;

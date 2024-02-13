@@ -1,0 +1,12 @@
+package P1 is
+
+   type Kind is range 0 .. 2 ** 16 - 1 with Size => 16;
+
+   type Frame is
+      message
+         Kind : Kind;
+         Payload : Opaque
+            with Size => Message'Last - Kind'Last;
+      end message;
+
+end P1;

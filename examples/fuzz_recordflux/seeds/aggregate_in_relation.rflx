@@ -1,0 +1,35 @@
+package Aggregate_In_Relation is
+
+   type B is range 0 .. 2 ** 8 - 1 with Size => 8;
+   type C is range 0 .. 2 ** 8 - 1 with Size => 8;
+   type D is range 0 .. 2 ** 8 - 1 with Size => 8;
+
+   type E is range 0 .. 2 ** 8 - 1 with Size => 8;
+   type S is sequence of E;
+
+   type Aggregate_In_Relation_Msg is
+      message
+         Fld_A : Opaque
+            with Size => 16
+            then Fld_B
+               if Fld_A = [16#AA#, 16#AA#]
+            then null
+               if [16#AA#, 16#AA#] /= Fld_A;
+         Fld_B : B
+            then Fld_C
+               if [16#01#, 16#02#] = [16#01#, 16#02#]
+            then null
+               if [16#01#, 16#02#] /= [16#01#, 16#02#];
+         Fld_C : S
+            with Size => 16
+            then Fld_D
+               if Fld_C = [16#CC#, 16#CC#]
+            then null
+               if Fld_C /= [16#CC#, 16#CC#];
+         Fld_D : Opaque
+            with Size => 16
+            then null
+               if Fld_D = Fld_A;
+      end message;
+
+end Aggregate_In_Relation;
