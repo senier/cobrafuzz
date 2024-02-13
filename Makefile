@@ -29,7 +29,7 @@ test_build: .devel_installed
 
 install_devel: .devel_installed
 
-.devel_installed:
+.devel_installed: pyproject.toml
 	pip install -U pip
 	pip install -e .[devel]
 	touch $@
