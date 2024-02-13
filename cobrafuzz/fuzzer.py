@@ -137,8 +137,8 @@ class Fuzzer:
         self,
         crash_dir: Path,
         target: Callable[[bytes], None],
-        close_stderr: bool = False,
-        close_stdout: bool = False,
+        close_stderr: Optional[bool] = None,
+        close_stdout: Optional[bool] = None,
         stat_frequency: int = 5,
         max_crashes: Optional[int] = None,
         max_input_size: int = 4096,
@@ -195,8 +195,8 @@ class Fuzzer:
         self._crash_dir = crash_dir
         self._target_bytes = pickle.dumps(target)
 
-        self._close_stderr = close_stderr
-        self._close_stdout = close_stdout
+        self._close_stderr = close_stderr or False
+        self._close_stdout = close_stdout or False
         self._stat_frequency = stat_frequency
         self._max_crashes = max_crashes
         self._max_runs = max_runs
