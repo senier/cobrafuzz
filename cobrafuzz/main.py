@@ -38,14 +38,12 @@ class CobraFuzz:
         )
         parser.add_argument(
             "--close-stdout",
-            type=bool,
-            default=False,
+            action="store_true",
             help="Close standard output on worker startup.",
         )
         parser.add_argument(
             "--close-stderr",
-            type=bool,
-            default=False,
+            action="store_true",
             help="Close standard error on worker startup.",
         )
         parser.add_argument(
