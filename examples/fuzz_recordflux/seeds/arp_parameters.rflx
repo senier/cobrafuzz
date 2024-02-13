@@ -1,0 +1,209 @@
+-- AUTOMATICALLY GENERATED. DO NOT EDIT.
+-- Generation date: 2023-11-03
+-- Address Resolution Protocol (ARP) Parameters
+-- Registry last updated on 2016-07-20
+
+package Arp_Parameters is
+
+   type Operation_Codes is
+      (-- Ref: rfc826
+       -- Ref: rfc5227
+       REQUEST => 1,
+
+       -- Ref: rfc826
+       -- Ref: rfc5227
+       REPLY => 2,
+
+       -- Ref: rfc903
+       Request_Reverse => 3,
+
+       -- Ref: rfc903
+       Reply_Reverse => 4,
+
+       -- Ref: rfc1931
+       DRARP_Request => 5,
+
+       -- Ref: rfc1931
+       DRARP_Reply => 6,
+
+       -- Ref: rfc1931
+       DRARP_Error => 7,
+
+       -- Ref: rfc2390
+       InARP_Request => 8,
+
+       -- Ref: rfc2390
+       InARP_Reply => 9,
+
+       -- Ref: rfc1577
+       ARP_NAK => 10,
+
+       -- Ref: Grenville_Armitage
+       MARS_Request => 11,
+
+       -- Ref: Grenville_Armitage
+       MARS_Multi => 12,
+
+       -- Ref: Grenville_Armitage
+       MARS_MServ => 13,
+
+       -- Ref: Grenville_Armitage
+       MARS_Join => 14,
+
+       -- Ref: Grenville_Armitage
+       MARS_Leave => 15,
+
+       -- Ref: Grenville_Armitage
+       MARS_NAK => 16,
+
+       -- Ref: Grenville_Armitage
+       MARS_Unserv => 17,
+
+       -- Ref: Grenville_Armitage
+       MARS_SJoin => 18,
+
+       -- Ref: Grenville_Armitage
+       MARS_SLeave => 19,
+
+       -- Ref: Grenville_Armitage
+       MARS_Grouplist_Request => 20,
+
+       -- Ref: Grenville_Armitage
+       MARS_Grouplist_Reply => 21,
+
+       -- Ref: Grenville_Armitage
+       MARS_Redirect_Map => 22,
+
+       -- Ref: Mitsuru_Maruyama
+       -- Ref: rfc2176
+       MAPOS_UNARP => 23,
+
+       -- Ref: rfc5494
+       OP_EXP1 => 24,
+
+       -- Ref: rfc5494
+       OP_EXP2 => 25)
+   with Size => 16;
+
+   type Hardware_Types is
+      (-- Ref: Jon_Postel
+       Ethernet => 1,
+
+       -- Ref: Jon_Postel
+       Experimental_Ethernet => 2,
+
+       -- Ref: Philip_Koch
+       Amateur_Radio_AX_25 => 3,
+
+       -- Ref: Avri_Doria
+       Proteon_ProNET_Token_Ring => 4,
+
+       -- Ref: Gill_Pratt
+       Chaos => 5,
+
+       -- Ref: Jon_Postel
+       IEEE_802_Networks => 6,
+
+       -- Ref: rfc1201
+       ARCNET => 7,
+
+       -- Ref: Jon_Postel
+       Hyperchannel => 8,
+
+       -- Ref: Tom_Unger
+       Lanstar => 9,
+
+       -- Ref: Mike_Burrows
+       Autonet_Short_Address => 10,
+
+       -- Ref: Joyce_K_Reynolds
+       LocalTalk => 11,
+
+       -- xref = Joseph Murdock
+       LocalNet => 12,
+
+       -- Ref: Rajiv_Dhingra
+       Ultra_Link => 13,
+
+       -- Ref: George_Clapp
+       SMDS => 14,
+
+       -- Ref: Andy_Malis
+       Frame_Relay => 15,
+
+       -- xref = [JXB2]
+       Asynchronous_Transmission_Mode_16 => 16,
+
+       -- Ref: Jon_Postel
+       HDLC => 17,
+
+       -- Ref: rfc4338
+       Fibre_Channel => 18,
+
+       -- Ref: rfc2225
+       Asynchronous_Transmission_Mode_19 => 19,
+
+       -- Ref: Jon_Postel
+       Serial_Line => 20,
+
+       -- Ref: Mike_Burrows
+       Asynchronous_Transmission_Mode_21 => 21,
+
+       -- Ref: Herb_Jensen
+       MIL_STD_188_220 => 22,
+
+       -- Ref: Jonathan_Stone
+       Metricom => 23,
+
+       -- Ref: Myron_Hattig
+       IEEE_1394_1995 => 24,
+
+       -- Ref: Mitsuru_Maruyama
+       -- Ref: rfc2176
+       MAPOS => 25,
+
+       -- Ref: Marion_Pitts
+       Twinaxial => 26,
+
+       -- Ref: Kenji_Fujisawa
+       EUI_64 => 27,
+
+       -- Ref: Jean_Michel_Pittet
+       HIPARP => 28,
+
+       -- Ref: Scott_Guthery
+       IP_And_ARP_Over_ISO_7816_3 => 29,
+
+       -- Ref: Jerome_Etienne
+       ARPSec => 30,
+
+       -- Ref: rfc3456
+       IPsec_Tunnel => 31,
+
+       -- Ref: rfc4391
+       InfiniBand => 32,
+
+       -- xref = Jeff Anderson, Telecommunications Industry of America (TIA) TR-8.5
+       --  Formulating Group, <cja015&motorola.com>, June 2004
+       TIA_102_Project_25_Common_Air_Interface => 33,
+
+       -- Ref: Scott_Guthery_2
+       Wiegand_Interface => 34,
+
+       -- Ref: Inaky_Perez-Gonzalez
+       Pure_IP => 35,
+
+       -- Ref: rfc5494
+       HW_EXP1 => 36,
+
+       -- Ref: Tseng-Hui_Lin
+       HFI => 37,
+
+       -- Ref: rfc5494
+       HW_EXP2 => 256,
+
+       -- Ref: Geoffroy_Gramaize
+       AEthernet => 257)
+   with Size => 16;
+
+end Arp_Parameters;

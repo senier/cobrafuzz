@@ -1,0 +1,16 @@
+package Sequence_Type is
+
+   type Byte is range 0 .. 255 with Size => 8;
+   type Bytes is sequence of Byte;
+
+   type Foo is
+      message
+         Length : Byte
+            then Bytes
+               with Size => Length * 8;
+         Bytes : Bytes;
+      end message;
+
+   type Bar is sequence of Foo;
+
+end Sequence_Type;

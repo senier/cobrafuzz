@@ -1,0 +1,17 @@
+package Checksum_Message is
+
+   type A is range 0 .. 2 ** 8 - 1 with Size => 8;
+   type B is range 0 .. 2 ** 8 - 1 with Size => 8;
+   type C is range 0 .. 2 ** 8 - 1 with Size => 8;
+
+   type Message is
+      message
+         A : A;
+         B : B;
+         C : C
+            then null
+               if C'Valid_Checksum;
+      end message with
+         Checksum => (C => (A, B));
+
+end Checksum_Message;
