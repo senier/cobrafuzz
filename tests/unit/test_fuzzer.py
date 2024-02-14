@@ -13,9 +13,8 @@ class DummyError(Exception):
 
 
 def non_crashing_target(data: bytes) -> None:
-    if len(data) > 0:  # noqa: SIM102
-        if data[0] == 42:
-            return  # pragma: no cover
+    if data[0] == 42:
+        return  # pragma: no cover
 
 
 def crashing_target_simple(data: bytes) -> None:

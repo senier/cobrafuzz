@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import random
-from secrets import choice, randbelow, randbits
 from typing import Generic, Optional, TypeVar
 
 
@@ -12,7 +11,7 @@ class OutOfBoundsError(Exception):
 PopulationType = TypeVar("PopulationType")
 
 
-class AdaptiveChoice(Generic[PopulationType]):
+class AdaptiveChoiceBase(Generic[PopulationType]):
     def __init__(self, population: list[PopulationType]) -> None:
         self._population = population
         self._distribution = [1.0 for _ in self._population]
@@ -33,44 +32,39 @@ class AdaptiveChoice(Generic[PopulationType]):
         self._normalize_distribution()
 
 
-class AdaptiveRand(AdaptiveChoice[int]):
+class AdaptiveIntChoice(AdaptiveChoiceBase[int]):
+    pass
+
+
+class AdaptiveRange(AdaptiveIntChoice):
     def __init__(self, lower: int, upper: int) -> None:
         if lower > upper:
             raise OutOfBoundsError(
                 f"Lower bound must be lower than upper bound ({lower} > {upper})",
             )
         super().__init__(list(range(lower, upper + 1)))
+        self._lower = lower
+        self._upper = upper
 
+    def sample_max(self, maximum: int) -> int:
+        if maximum < self._lower:
+            raise OutOfBoundsError(
+                f"Maximum must be greater than lower bound ({maximum} < {self._lower})",
+            )
+        if maximum > self._upper:
+            raise OutOfBoundsError(
+                f"Maximum must be smaller or equal to upper bound ({maximum} > {self._upper})",
+            )
+        if maximum == self._lower:
+            return self._lower
 
-def rand(n: int) -> int:
-    if n < 1:
-        return 0
-    return randbelow(n)
+        self._last = random.choices(  # noqa: S311
+            population=self._population[: maximum - self._lower],
+            weights=self._distribution[: maximum - self._lower],
+            k=1,
+        )[0]
 
-
-def rand_bool() -> bool:
-    return choice([True, False])
-
-
-def rand_exp() -> int:
-    """Generate random value with distribution 1/2^(n+1)."""
-    return f"{randbits(32):032b}1".index("1")
-
-
-def choose_len(n: int) -> int:
-    """
-    Choose a length based on input value.
-
-    With 90% probability, choose a random value in [1, n] (if n <=  8, otherwise [1, 8])
-    With  9% probability, choose a random value in [1, n] (if n <= 32, otherwise [1, 32])
-    With  1% probability, choose a random value in [1, n]
-    """
-    x = rand(100)
-    if x < 90:
-        return rand(min(8, n)) + 1
-    if x < 99:
-        return rand(min(32, n)) + 1
-    return rand(n) + 1
+        return self._last
 
 
 def copy(
