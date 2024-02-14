@@ -3,10 +3,11 @@ from __future__ import annotations
 import ast
 import json
 import logging
+import secrets
 from pathlib import Path
 from typing import Optional
 
-from cobrafuzz import mutator, util
+from cobrafuzz import mutator
 
 
 class LoadError(Exception):
@@ -111,5 +112,6 @@ class State:
 
     def get_input(self) -> bytearray:
         return self._mutator.mutate(
-            buf=list(self._inputs)[util.rand(len(self._inputs))],
+            # TODO(senier): Replace my stateful interface inside mutator, remove use of util.rand
+            buf=list(self._inputs)[secrets.randbelow(len(self._inputs))],
         )

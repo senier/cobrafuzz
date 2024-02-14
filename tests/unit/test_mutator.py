@@ -1,78 +1,83 @@
 from __future__ import annotations
 
+import random
 import secrets
 
 import pytest
 
-from cobrafuzz import util
-from cobrafuzz.mutator import Mutator, OutOfDataError
+from cobrafuzz import mutator, util
+
+
+class StaticRand(util.AdaptiveRange):
+    def __init__(self, value: int) -> None:
+        super().__init__(lower=value, upper=value)
+        self._value = value
+
+    def sample_max(self, _: int) -> int:
+        return self._value
 
 
 def test_mutate(monkeypatch: pytest.MonkeyPatch) -> None:
-    mutator = Mutator()
+    def modify(data: bytearray, _: mutator.Rands) -> None:
+        data.insert(0, ord("a"))
+        data.append(ord("b"))
+
+    m = mutator.Mutator()
     with monkeypatch.context() as mp:
-        mp.setattr(util, "rand_exp", lambda: 2)
-        mp.setattr(util, "rand", lambda _: 5)
-        mp.setattr(secrets, "token_bytes", lambda _: bytearray(b"inserted"))
-        mp.setattr(
-            secrets,
-            "choice",
-            lambda _: mutator._mutate_insert_range_of_bytes,  # noqa: SLF001
-        )
-        assert mutator.mutate(bytearray(b"0123456789")) == bytearray(b"01234insertedinserted56789")
+        mp.setattr(m, "_mutators", [(modify, None)])
+        mp.setattr(m, "_modifications", StaticRand(1))
+        assert m.mutate(bytearray(b"0123456789")) == bytearray(b"a0123456789b")
 
 
 def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
-    mutator = Mutator()
+    m = mutator.Mutator()
 
-    def modify(res: bytearray) -> bool:
-        if res[0] != 0:
-            res[0] = 0
-            return False
-        return True
+    def modify(data: bytearray, _: mutator.Rands) -> None:
+        if data[0] != 0:
+            data[0] = 0
 
     with monkeypatch.context() as mp:
-        mp.setattr(util, "rand_exp", lambda: 2)
-        mp.setattr(secrets, "choice", lambda _, _c=None: modify)
-        assert mutator.mutate(bytearray(b"0123456789")) == bytearray(b"\x00123456789")
+        mp.setattr(m, "_mutators", [(modify, None)])
+        assert m.mutate(bytearray(b"0123456789")) == bytearray(b"\x00123456789")
 
 
 def test_mutate_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
-    mutator = Mutator(max_input_size=4)
+    m = mutator.Mutator(max_input_size=4)
     with monkeypatch.context() as mp:
-        mp.setattr(util, "rand_exp", lambda: 1)
-        mp.setattr(secrets, "choice", lambda _: lambda x: x)
-        assert mutator.mutate(bytearray(b"0123456789")) == bytearray(b"0123")
+        mp.setattr(m, "_mutators", [(lambda _data, _: None, None)])
+        assert m.mutate(bytearray(b"0123456789")) == bytearray(b"0123")
 
 
 def test_mutate_remove_range_of_bytes_fail() -> None:
-    mutator = Mutator()
     res = bytearray()
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_remove_range_of_bytes(res)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_remove_range_of_bytes(res, mutator.Rands())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
     ("data", "start", "length", "expected"),
     [
         (b"0123456789", 0, 1, b"123456789"),
+        (b"0123456789", 5, 2, b"01234789"),
+        (b"0123456789", 7, 3, b"0123456"),
     ],
 )
 def test_mutate_remove_range_of_bytes_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     start: int,
     length: int,
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
 
-    with monkeypatch.context() as mp:
-        mp.setattr(util, "rand", lambda _: start)
-        mp.setattr(util, "choose_len", lambda _: length)
-        mutator._mutate_remove_range_of_bytes(tmp)  # noqa: SLF001
-        assert tmp == expected
+    mutator._mutate_remove_range_of_bytes(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            start=StaticRand(start),
+            length=StaticRand(length),
+        ),
+    )
+    assert tmp == expected
 
 
 @pytest.mark.parametrize(
@@ -91,24 +96,24 @@ def test_mutate_insert_range_of_bytes_success(
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
 
     with monkeypatch.context() as mp:
         mp.setattr(secrets, "token_bytes", lambda n: n * b"X")
-        mp.setattr(util, "rand", lambda _: start)
-        mp.setattr(util, "choose_len", lambda _: length)
         mutator._mutate_insert_range_of_bytes(  # noqa: SLF001
             tmp,
+            mutator.Rands(
+                start=StaticRand(start),
+                length=StaticRand(length),
+            ),
         )
         assert tmp == expected
 
 
 def test_mutate_duplicate_range_of_bytes_fail() -> None:
     data = bytearray(b"")
-    mutator = Mutator()
 
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_duplicate_range_of_bytes(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_duplicate_range_of_bytes(data, mutator.Rands())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -123,7 +128,6 @@ def test_mutate_duplicate_range_of_bytes_fail() -> None:
     ],
 )
 def test_mutate_duplicate_range_of_bytes_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     start: int,
     length: int,
@@ -131,31 +135,23 @@ def test_mutate_duplicate_range_of_bytes_success(
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
 
-    with monkeypatch.context() as mp:
-
-        def rand(_: int) -> int:
-            if not rand.second:  # type: ignore[attr-defined]
-                rand.second = True  # type: ignore[attr-defined]
-                return start
-            rand.second = None  # type: ignore[attr-defined]
-            return dest
-
-        rand.second = None  # type: ignore[attr-defined]
-
-        mp.setattr(util, "rand", rand)
-        mp.setattr(util, "choose_len", lambda _: length)
-        mutator._mutate_duplicate_range_of_bytes(tmp)  # noqa: SLF001
-        assert tmp == expected
+    mutator._mutate_duplicate_range_of_bytes(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            src_pos=StaticRand(start),
+            dst_pos=StaticRand(dest),
+            length=StaticRand(length),
+        ),
+    )
+    assert tmp == expected
 
 
 def test_mutate_copy_range_of_bytes_fail() -> None:
     data = bytearray(b"")
-    mutator = Mutator()
 
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_copy_range_of_bytes(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_copy_range_of_bytes(data, mutator.Rands())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -169,7 +165,6 @@ def test_mutate_copy_range_of_bytes_fail() -> None:
     ],
 )
 def test_mutate_copy_range_of_bytes_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     start: int,
     length: int,
@@ -177,31 +172,23 @@ def test_mutate_copy_range_of_bytes_success(
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
 
-    with monkeypatch.context() as mp:
-
-        def rand(_: int) -> int:
-            if not rand.second:  # type: ignore[attr-defined]
-                rand.second = True  # type: ignore[attr-defined]
-                return start
-            rand.second = None  # type: ignore[attr-defined]
-            return dest
-
-        rand.second = None  # type: ignore[attr-defined]
-
-        mp.setattr(util, "rand", rand)
-        mp.setattr(util, "choose_len", lambda _: length)
-        mutator._mutate_copy_range_of_bytes(tmp)  # noqa: SLF001
-        assert tmp == expected
+    mutator._mutate_copy_range_of_bytes(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            src_pos=StaticRand(start),
+            dst_pos=StaticRand(dest),
+            length=StaticRand(length),
+        ),
+    )
+    assert tmp == expected
 
 
 def test_mutate_bit_flip_fail() -> None:
     data = bytearray(b"")
-    mutator = Mutator()
 
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_bit_flip(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_bit_flip(data, mutator.Rands())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -214,65 +201,61 @@ def test_mutate_bit_flip_fail() -> None:
     ],
 )
 def test_mutate_bit_flip_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     byte: int,
     bit: int,
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
 
-    # This would confuse our mocked _rand function below
-    assert len(data) != 8, "data length must not be 8 in this test"
-
-    with monkeypatch.context() as mp:
-        mp.setattr(util, "rand", lambda n: bit if n == 8 else byte)
-        mutator._mutate_bit_flip(tmp)  # noqa: SLF001
-        assert tmp == expected
+    mutator._mutate_bit_flip(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            bit_pos=StaticRand(bit),
+            byte_pos=StaticRand(byte),
+        ),
+    )
+    assert tmp == expected
 
 
 def test_mutate_flip_random_bits_of_random_byte_fail() -> None:
     data = bytearray(b"")
-    mutator = Mutator()
 
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_flip_random_bits_of_random_byte(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_flip_random_bits_of_random_byte(data, mutator.Rands())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
     ("data", "byte", "value", "expected"),
     [
-        (b"0123456789", 0, 124, b"M123456789"),
-        (b"0123456789", 5, 117, b"01234C6789"),
-        (b"0123456789", 9, 121, b"012345678C"),
+        (b"0123456789", 0, 124, b"L123456789"),
+        (b"0123456789", 5, 117, b"01234@6789"),
+        (b"0123456789", 9, 121, b"012345678@"),
     ],
 )
 def test_mutate_flip_random_bits_of_random_byte_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     byte: int,
     value: int,
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
 
-    # This would confuse our mocked _rand function below
-    assert len(data) != 255, "data length must not be 255 in this test"
-
-    with monkeypatch.context() as mp:
-        mp.setattr(util, "rand", lambda n: value if n == 255 else byte)
-        mutator._mutate_flip_random_bits_of_random_byte(tmp)  # noqa: SLF001
-        assert tmp == expected
+    mutator._mutate_flip_random_bits_of_random_byte(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            pos=StaticRand(byte),
+            value=StaticRand(value),
+        ),
+    )
+    assert tmp == expected
 
 
 def test_mutate_swap_two_bytes_fail() -> None:
     data = bytearray(b"")
-    mutator = Mutator()
 
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_swap_two_bytes(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_swap_two_bytes(data, mutator.Rands())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -288,37 +271,28 @@ def test_mutate_swap_two_bytes_fail() -> None:
     ],
 )
 def test_mutate_swap_two_bytes(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     source: int,
     dest: int,
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
 
-    with monkeypatch.context() as mp:
-
-        def rand(_: int) -> int:
-            if not rand.second:  # type: ignore[attr-defined]
-                rand.second = True  # type: ignore[attr-defined]
-                return source
-            rand.second = None  # type: ignore[attr-defined]
-            return dest
-
-        rand.second = None  # type: ignore[attr-defined]
-
-        mp.setattr(util, "rand", rand)
-        mutator._mutate_swap_two_bytes(tmp)  # noqa: SLF001
-        assert tmp == expected
+    mutator._mutate_swap_two_bytes(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            first_pos=StaticRand(source),
+            second_pos=StaticRand(dest),
+        ),
+    )
+    assert tmp == expected
 
 
 def test_mutate_add_subtract_from_a_byte_fail() -> None:
     data = bytearray(b"")
-    mutator = Mutator()
 
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_add_subtract_from_a_byte(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_add_subtract_from_a_byte(data, mutator.Rands())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -334,30 +308,28 @@ def test_mutate_add_subtract_from_a_byte_fail() -> None:
     ],
 )
 def test_mutate_add_subtract_from_a_byte_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     position: int,
     value: int,
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
 
-    # This would confuse our mocked _rand function below
-    assert len(data) != 2**8, "data length must not be 2**8 in this test"
-
-    with monkeypatch.context() as mp:
-        mp.setattr(util, "rand", lambda n: value if n == 2**8 else position)
-        mutator._mutate_add_subtract_from_a_byte(tmp)  # noqa: SLF001
-        assert tmp == expected
+    mutator._mutate_add_subtract_from_a_byte(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            value=StaticRand(value),
+            pos=StaticRand(position),
+        ),
+    )
+    assert tmp == expected
 
 
 def test_mutate_add_subtract_from_a_uint16_fail() -> None:
     data = bytearray(b"")
-    mutator = Mutator()
 
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_add_subtract_from_a_uint16(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_add_subtract_from_a_uint16(data, mutator.Rands())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -378,24 +350,25 @@ def test_mutate_add_subtract_from_a_uint16_success(
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
-
-    # This would confuse our mocked _rand function below
-    assert len(data) != 2**16, "data length must not be 2**16 in this test"
 
     with monkeypatch.context() as mp:
-        mp.setattr(util, "rand", lambda n: value if n == 2**16 else position)
-        mp.setattr(util, "rand_bool", lambda: not little_endian)
-        mutator._mutate_add_subtract_from_a_uint16(tmp)  # noqa: SLF001
-        assert tmp == expected
+        mp.setattr(random, "randint", lambda _a, _b: value)
+        mutator._mutate_add_subtract_from_a_uint16(  # noqa: SLF001
+            tmp,
+            mutator.Rands(
+                value=StaticRand(value),
+                pos=StaticRand(position),
+                big_endian=StaticRand(0 if little_endian else 1),
+            ),
+        )
+    assert tmp == expected
 
 
 def test_mutate_add_subtract_from_a_uint32_fail() -> None:
     data = bytearray(b"")
-    mutator = Mutator()
 
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_add_subtract_from_a_uint32(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_add_subtract_from_a_uint32(data, mutator.Rands())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -416,24 +389,25 @@ def test_mutate_add_subtract_from_a_uint32_success(
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
-
-    # This would confuse our mocked _rand function below
-    assert len(data) != 2**32, "data length must not be 2**32 in this test"
 
     with monkeypatch.context() as mp:
-        mp.setattr(util, "rand", lambda n: value if n == 2**32 else position)
-        mp.setattr(util, "rand_bool", lambda: not little_endian)
-        mutator._mutate_add_subtract_from_a_uint32(tmp)  # noqa: SLF001
-        assert tmp == expected
+        mp.setattr(random, "randint", lambda _a, _b: value)
+        mutator._mutate_add_subtract_from_a_uint32(  # noqa: SLF001
+            tmp,
+            mutator.Rands(
+                value=StaticRand(value),
+                pos=StaticRand(position),
+                big_endian=StaticRand(0 if little_endian else 1),
+            ),
+        )
+    assert tmp == expected
 
 
 def test_mutate_add_subtract_from_a_uint64_fail() -> None:
     data = bytearray(b"")
-    mutator = Mutator()
 
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_add_subtract_from_a_uint64(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_add_subtract_from_a_uint64(data, mutator.Rands())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -454,24 +428,28 @@ def test_mutate_add_subtract_from_a_uint64_success(
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
-
-    # This would confuse our mocked _rand function below
-    assert len(data) != 2**64, "data length must not be 2**64 in this test"
 
     with monkeypatch.context() as mp:
-        mp.setattr(util, "rand", lambda n: value if n == 2**64 else position)
-        mp.setattr(util, "rand_bool", lambda: not little_endian)
-        mutator._mutate_add_subtract_from_a_uint64(tmp)  # noqa: SLF001
-        assert tmp == expected
+        mp.setattr(random, "randint", lambda _a, _b: value)
+        mutator._mutate_add_subtract_from_a_uint64(  # noqa: SLF001
+            tmp,
+            mutator.Rands(
+                value=StaticRand(value),
+                pos=StaticRand(position),
+                big_endian=StaticRand(0 if little_endian else 1),
+            ),
+        )
+    assert tmp == expected
 
 
 def test_mutate_replace_a_byte_with_an_interesting_value_fail() -> None:
     data = bytearray(b"")
-    mutator = Mutator()
 
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_replace_a_byte_with_an_interesting_value(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_replace_a_byte_with_an_interesting_value(  # noqa: SLF001
+            data,
+            mutator.Rands(),
+        )
 
 
 @pytest.mark.parametrize(
@@ -486,28 +464,31 @@ def test_mutate_replace_a_byte_with_an_interesting_value_fail() -> None:
     ],
 )
 def test_mutate_replace_a_byte_with_an_interesting_value_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     position: int,
     value: int,
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
 
-    with monkeypatch.context() as mp:
-        mp.setattr(util, "rand", lambda _: position)
-        mp.setattr(mutator, "_INTERESTING8", [value])
-        mutator._mutate_replace_a_byte_with_an_interesting_value(tmp)  # noqa: SLF001
-        assert tmp == expected
+    mutator._mutate_replace_a_byte_with_an_interesting_value(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            interesting_8=StaticRand(value),
+            pos=StaticRand(position),
+        ),
+    )
+    assert tmp == expected
 
 
 def test_mutate_replace_an_uint16_with_an_interesting_value_fail() -> None:
     data = bytearray(b"")
-    mutator = Mutator()
 
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_replace_an_uint16_with_an_interesting_value(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_replace_an_uint16_with_an_interesting_value(  # noqa: SLF001
+            data,
+            mutator.Rands(),
+        )
 
 
 @pytest.mark.parametrize(
@@ -522,7 +503,6 @@ def test_mutate_replace_an_uint16_with_an_interesting_value_fail() -> None:
     ],
 )
 def test_mutate_replace_an_uint16_with_an_interesting_value_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     position: int,
     value: int,
@@ -530,22 +510,26 @@ def test_mutate_replace_an_uint16_with_an_interesting_value_success(
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
 
-    with monkeypatch.context() as mp:
-        mp.setattr(util, "rand", lambda _: position)
-        mp.setattr(mutator, "_INTERESTING16", [value])
-        mp.setattr(util, "rand_bool", lambda: not little_endian)
-        mutator._mutate_replace_an_uint16_with_an_interesting_value(tmp)  # noqa: SLF001
-        assert tmp == expected
+    mutator._mutate_replace_an_uint16_with_an_interesting_value(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            interesting_16=StaticRand(value),
+            pos=StaticRand(position),
+            big_endian=StaticRand(0 if little_endian else 1),
+        ),
+    )
+    assert tmp == expected
 
 
 def test_mutate_replace_an_uint32_with_an_interesting_value_fail() -> None:
     data = bytearray(b"")
-    mutator = Mutator()
 
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_replace_an_uint32_with_an_interesting_value(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_replace_an_uint32_with_an_interesting_value(  # noqa: SLF001
+            data,
+            mutator.Rands(),
+        )
 
 
 @pytest.mark.parametrize(
@@ -560,7 +544,6 @@ def test_mutate_replace_an_uint32_with_an_interesting_value_fail() -> None:
     ],
 )
 def test_mutate_replace_an_uint32_with_an_interesting_value_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     position: int,
     value: int,
@@ -568,22 +551,26 @@ def test_mutate_replace_an_uint32_with_an_interesting_value_success(
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
 
-    with monkeypatch.context() as mp:
-        mp.setattr(util, "rand", lambda _: position)
-        mp.setattr(mutator, "_INTERESTING32", [value])
-        mp.setattr(util, "rand_bool", lambda: not little_endian)
-        mutator._mutate_replace_an_uint32_with_an_interesting_value(tmp)  # noqa: SLF001
-        assert tmp == expected
+    mutator._mutate_replace_an_uint32_with_an_interesting_value(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            interesting_32=StaticRand(value),
+            pos=StaticRand(position),
+            big_endian=StaticRand(0 if little_endian else 1),
+        ),
+    )
+    assert tmp == expected
 
 
 def test_mutate_replace_an_ascii_digit_with_another_digit_fail() -> None:
     data = bytearray(b"no digits present")
-    mutator = Mutator()
 
-    with pytest.raises(OutOfDataError):
-        mutator._mutate_replace_an_ascii_digit_with_another_digit(data)  # noqa: SLF001
+    with pytest.raises(mutator.OutOfDataError):
+        mutator._mutate_replace_an_ascii_digit_with_another_digit(  # noqa: SLF001
+            data,
+            mutator.Rands(),
+        )
 
 
 @pytest.mark.parametrize(
@@ -597,17 +584,18 @@ def test_mutate_replace_an_ascii_digit_with_another_digit_fail() -> None:
     ],
 )
 def test_mutate_replace_an_ascii_digit_with_another_digit_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     position: int,
     value: int,
     expected: bytes,
 ) -> None:
     tmp = bytearray(data)
-    mutator = Mutator()
 
-    with monkeypatch.context() as mp:
-        mp.setattr(secrets, "choice", lambda d: (position, tmp[position]) if len(d) > 1 else d[0])
-        mp.setattr(mutator, "_DIGITS", {ord("0") + value})
-        mutator._mutate_replace_an_ascii_digit_with_another_digit(tmp)  # noqa: SLF001
-        assert tmp == expected
+    mutator._mutate_replace_an_ascii_digit_with_another_digit(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            pos=StaticRand(position),
+            digits=StaticRand(ord("0") + value),
+        ),
+    )
+    assert tmp == expected
