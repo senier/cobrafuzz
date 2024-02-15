@@ -2,7 +2,7 @@ PYTHON_PACKAGES = cobrafuzz/*.py tests/**/*.py examples/**/*.py
 
 all: check test
 
-check: check_ruff check_mypy check_black check_kacl
+check: check_ruff check_mypy check_black check_kacl check_dead_code
 
 check_ruff: .devel_installed
 	ruff check $(PYTHON_PACKAGES)
@@ -15,6 +15,9 @@ check_mypy: .devel_installed
 
 check_kacl: .devel_installed
 	kacl-cli verify
+
+check_dead_code: .devel_installed
+	vulture --ignore-names "CobraFuzz" cobrafuzz
 
 test: test_unit test_integration test_build
 
