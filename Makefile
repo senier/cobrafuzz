@@ -4,7 +4,7 @@ PYTEST = $(PYTHON) -m pytest
 
 all: check test
 
-check: check_ruff check_mypy check_black check_kacl check_dead_code
+check: check_ruff check_mypy check_black check_kacl check_dead_code check_todo
 
 check_ruff: .devel_installed
 	ruff check $(PYTHON_PACKAGES)
@@ -20,6 +20,9 @@ check_kacl: .devel_installed
 
 check_dead_code: .devel_installed
 	vulture --ignore-names "CobraFuzz" cobrafuzz
+
+check_todo:
+	grep --line-number --color=auto -e '#\s*TODO.*$$' **/*.py
 
 test: test_unit test_integration test_build
 
