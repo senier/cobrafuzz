@@ -2,6 +2,7 @@ import re
 import sys
 from pathlib import Path
 
+import dill  # type: ignore[import-untyped]
 import pytest
 
 from cobrafuzz import fuzzer
@@ -145,3 +146,20 @@ def test_crash_stderr_stdout_closed(tmp_path: Path) -> None:
     with pytest.raises(SystemExit, match="^1$"):
         f.start()
     assert crash_dir.is_dir()
+
+
+def test_internal_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    with monkeypatch.context() as mp:
+        # Letting dill.loads fail in the worker by injecting an invalid result to dill.dumps
+        # is our only way to trigger an error. Child processes are freshly spawned and hence we
+        # cannot monkeypatch them.
+        mp.setattr(dill, "dumps", lambda _: b"0")
+        f = fuzzer.Fuzzer(
+            target=non_crashing_target,
+            crash_dir=tmp_path,
+            max_runs=1,
+            num_workers=1,
+            load_crashes=False,
+        )
+        with pytest.raises(SystemExit, match="INTERNAL ERROR"):
+            f.start()
