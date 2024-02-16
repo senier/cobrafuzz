@@ -333,6 +333,13 @@ class Fuzzer:
         result.start()
         return result, queue
 
+    def _terminate_workers(self) -> None:
+        self._result_queue.cancel_join_thread()
+        for p, q in self._workers:
+            q.cancel_join_thread()
+            p.terminate()
+            p.join(timeout=1)
+
     def start(self) -> None:  # noqa: PLR0912
         start_time = time.time()
 
@@ -369,6 +376,7 @@ class Fuzzer:
                 result = self._result_queue.get()
 
                 if isinstance(result, Bug):
+                    self._terminate_workers()
                     sys.exit(
                         "===================================================================\n"
                         "                          INTERNAL ERROR.                          \n"
@@ -411,13 +419,5 @@ class Fuzzer:
 
         self._state.save()
 
-        for _, queue in self._workers:
-            queue.cancel_join_thread()
-        self._result_queue.cancel_join_thread()
-
-        for p, _ in self._workers:
-            p.terminate()
-
-        for p, _ in self._workers:
-            p.join()
+        self._terminate_workers()
         sys.exit(0 if self._current_crashes == 0 else 1)
