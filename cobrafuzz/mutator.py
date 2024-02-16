@@ -17,7 +17,7 @@ class Rands:
         self._data: dict[str, util.AdaptiveIntChoice] = kwargs
 
     def __getattr__(self, attr: str) -> util.AdaptiveIntChoice:
-        if attr not in self._data:
+        if attr.startswith("_") or attr not in self._data:
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
         return self._data[attr]
 
