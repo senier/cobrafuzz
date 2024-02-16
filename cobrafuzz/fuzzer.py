@@ -6,6 +6,7 @@ import logging
 import multiprocessing as mp
 import sys
 import time
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, Union, cast
@@ -28,8 +29,17 @@ class Update:
 
 
 @dataclass
-class Status:
+class StatusBase:
     wid: int
+
+
+@dataclass
+class Bug(StatusBase):
+    message: str
+
+
+@dataclass
+class Status(StatusBase):
     runs: int
 
 
@@ -67,7 +77,32 @@ def worker(  # noqa: PLR0913
     wid: int,
     target_bytes: bytes,
     update_queue: mp.Queue[Update],
-    result_queue: mp.Queue[Status],
+    result_queue: mp.Queue[StatusBase],
+    close_stdout: bool,
+    close_stderr: bool,
+    stat_frequency: int,
+    state: st.State,
+) -> None:
+    try:
+        _worker_run(
+            wid=wid,
+            target_bytes=target_bytes,
+            update_queue=update_queue,
+            result_queue=result_queue,
+            close_stdout=close_stdout,
+            close_stderr=close_stderr,
+            stat_frequency=stat_frequency,
+            state=state,
+        )
+    except Exception:  # noqa: BLE001
+        result_queue.put(Bug(wid=wid, message=traceback.format_exc()))
+
+
+def _worker_run(  # noqa: PLR0913
+    wid: int,
+    target_bytes: bytes,
+    update_queue: mp.Queue[Update],
+    result_queue: mp.Queue[StatusBase],
     close_stdout: bool,
     close_stderr: bool,
     stat_frequency: int,
@@ -149,6 +184,7 @@ class Fuzzer:
         seeds: Optional[list[Path]] = None,
         start_method: Optional[str] = None,
         state_file: Optional[Path] = None,
+        load_crashes: bool = True,
     ):
         """
         Fuzz-test target and store crash artifacts into crash_dir.
@@ -174,6 +210,7 @@ class Fuzzer:
                         to deadlocks.
         state_file:     File to load state from. Will be updated periodically. If no file is
                         specified, the state will be held in memory and discarded on exit.
+        load_crashes:   Load crashes from crash directory on startup.
         """
 
         self._current_crashes = 0
@@ -204,7 +241,8 @@ class Fuzzer:
         self._num_workers: int = num_workers or self._mp_ctx.cpu_count() - 1
         self._state = st.State(seeds=seeds, max_input_size=max_input_size, file=state_file)
 
-        self._load_crashes(regression=regression)
+        if load_crashes:
+            self._load_crashes(regression=regression)
 
     def _load_crashes(self, regression: bool) -> None:
         """
@@ -329,6 +367,19 @@ class Fuzzer:
 
             while not self._result_queue.empty():
                 result = self._result_queue.get()
+
+                if isinstance(result, Bug):
+                    sys.exit(
+                        "===================================================================\n"
+                        "                          INTERNAL ERROR.                          \n"
+                        "===================================================================\n"
+                        " Please open a ticket:                                             \n"
+                        "   https://github.com/senier/cobrafuzz/issues/new/choose           \n"
+                        "===================================================================\n"
+                        f"{result.message}                                                   \n"
+                        "===================================================================\n",
+                    )
+
                 self._current_runs += result.runs
 
                 if isinstance(result, Error):
