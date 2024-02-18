@@ -21,7 +21,7 @@ def test_mutate(monkeypatch: pytest.MonkeyPatch) -> None:
 
     m = mutator.Mutator()
     with monkeypatch.context() as mp:
-        mp.setattr(m, "_mutators", [(modify, None)])
+        mp.setattr(m, "_mutators", util.AdaptiveChoiceBase([(modify, None)]))
         mp.setattr(m, "_modifications", StaticRand(1))
         assert m.mutate(bytearray(b"0123456789")) == bytearray(b"a0123456789b")
 
@@ -34,14 +34,14 @@ def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
             data[0] = 0
 
     with monkeypatch.context() as mp:
-        mp.setattr(m, "_mutators", [(modify, None)])
+        mp.setattr(m, "_mutators", util.AdaptiveChoiceBase([(modify, None)]))
         assert m.mutate(bytearray(b"0123456789")) == bytearray(b"\x00123456789")
 
 
 def test_mutate_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
     m = mutator.Mutator(max_input_size=4)
     with monkeypatch.context() as mp:
-        mp.setattr(m, "_mutators", [(lambda _data, _: None, None)])
+        mp.setattr(m, "_mutators", util.AdaptiveChoiceBase([(lambda _data, _: None, None)]))
         assert m.mutate(bytearray(b"0123456789")) == bytearray(b"0123")
 
 

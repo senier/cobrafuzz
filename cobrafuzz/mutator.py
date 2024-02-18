@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import random
 import struct
-from typing import Callable
+from typing import Callable, Optional
 
 from . import util
 
@@ -188,140 +187,154 @@ class Mutator:
     def __init__(self, max_input_size: int = 1024, max_modifications: int = 10):
         self._max_input_size = max_input_size
         self._modifications = util.AdaptiveRange(1, max_modifications)
-        self._mutators: list[tuple[Callable[[bytearray, Rands], None], Rands]] = [
-            (
-                _mutate_remove_range_of_bytes,
-                Rands(
-                    length=util.AdaptiveRange(1, max_input_size),
-                    start=util.AdaptiveRange(0, max_input_size),
-                ),
-            ),
-            (
-                _mutate_insert_range_of_bytes,
-                Rands(
-                    length=util.AdaptiveRange(1, 10),
-                    start=util.AdaptiveRange(0, max_input_size),
-                    data=util.AdaptiveRange(0, 255),
-                ),
-            ),
-            (
-                _mutate_duplicate_range_of_bytes,
-                Rands(
-                    src_pos=util.AdaptiveRange(0, max_input_size),
-                    dst_pos=util.AdaptiveRange(1, max_input_size),
-                    length=util.AdaptiveRange(1, max_input_size),
-                ),
-            ),
-            (
-                _mutate_copy_range_of_bytes,
-                Rands(
-                    src_pos=util.AdaptiveRange(0, max_input_size),
-                    dst_pos=util.AdaptiveRange(1, max_input_size),
-                    length=util.AdaptiveRange(1, max_input_size),
-                ),
-            ),
-            (
-                _mutate_bit_flip,
-                Rands(
-                    byte_pos=util.AdaptiveRange(0, max_input_size),
-                    bit_pos=util.AdaptiveRange(0, 7),
-                ),
-            ),
-            (
-                _mutate_flip_random_bits_of_random_byte,
-                Rands(
-                    pos=util.AdaptiveRange(0, max_input_size),
-                    value=util.AdaptiveRange(0, 255),
-                ),
-            ),
-            (
-                _mutate_swap_two_bytes,
-                Rands(
-                    first_pos=util.AdaptiveRange(0, max_input_size),
-                    second_pos=util.AdaptiveRange(0, max_input_size),
-                ),
-            ),
-            (
-                _mutate_add_subtract_from_a_byte,
-                Rands(
-                    pos=util.AdaptiveRange(0, max_input_size),
-                    value=util.AdaptiveRange(0, 255),
-                ),
-            ),
-            (
-                _mutate_add_subtract_from_a_uint16,
-                Rands(
-                    pos=util.AdaptiveRange(0, max_input_size),
-                    value=util.AdaptiveLargeRange(0, 2**16 - 1),
-                    big_endian=util.AdaptiveRange(0, 1),
-                ),
-            ),
-            (
-                _mutate_add_subtract_from_a_uint32,
-                Rands(
-                    pos=util.AdaptiveRange(0, max_input_size),
-                    value=util.AdaptiveLargeRange(0, 2**32 - 1),
-                    big_endian=util.AdaptiveRange(0, 1),
-                ),
-            ),
-            (
-                _mutate_add_subtract_from_a_uint64,
-                Rands(
-                    pos=util.AdaptiveRange(0, max_input_size),
-                    value=util.AdaptiveLargeRange(0, 2**64 - 1),
-                    big_endian=util.AdaptiveRange(0, 1),
-                ),
-            ),
-            (
-                _mutate_replace_a_byte_with_an_interesting_value,
-                Rands(
-                    pos=util.AdaptiveRange(0, max_input_size),
-                    interesting_8=util.AdaptiveIntChoice(
-                        population=[1, 1, 16, 32, 64, 100, 127, 128, 129, 255],
+        self._mutators: util.AdaptiveChoiceBase[
+            tuple[Callable[[bytearray, Rands], None], Rands]
+        ] = util.AdaptiveChoiceBase(
+            population=[
+                (
+                    _mutate_remove_range_of_bytes,
+                    Rands(
+                        length=util.AdaptiveRange(1, max_input_size),
+                        start=util.AdaptiveRange(0, max_input_size),
                     ),
                 ),
-            ),
-            (
-                _mutate_replace_an_uint16_with_an_interesting_value,
-                Rands(
-                    pos=util.AdaptiveRange(0, max_input_size),
-                    interesting_16=util.AdaptiveIntChoice(
-                        population=[0, 128, 255, 256, 512, 1000, 1024, 4096, 32767, 65535],
-                    ),
-                    big_endian=util.AdaptiveRange(0, 1),
-                ),
-            ),
-            (
-                _mutate_replace_an_uint32_with_an_interesting_value,
-                Rands(
-                    pos=util.AdaptiveRange(0, max_input_size),
-                    interesting_32=util.AdaptiveIntChoice(
-                        population=[0, 1, 32768, 65535, 65536, 100663045, 2147483647, 4294967295],
-                    ),
-                    big_endian=util.AdaptiveRange(0, 1),
-                ),
-            ),
-            (
-                _mutate_replace_an_ascii_digit_with_another_digit,
-                Rands(
-                    pos=util.AdaptiveRange(0, max_input_size),
-                    digits=util.AdaptiveIntChoice(
-                        population=[
-                            ord(i) for i in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
-                        ],
+                (
+                    _mutate_insert_range_of_bytes,
+                    Rands(
+                        length=util.AdaptiveRange(1, 10),
+                        start=util.AdaptiveRange(0, max_input_size),
+                        data=util.AdaptiveRange(0, 255),
                     ),
                 ),
-            ),
-        ]
+                (
+                    _mutate_duplicate_range_of_bytes,
+                    Rands(
+                        src_pos=util.AdaptiveRange(0, max_input_size),
+                        dst_pos=util.AdaptiveRange(1, max_input_size),
+                        length=util.AdaptiveRange(1, max_input_size),
+                    ),
+                ),
+                (
+                    _mutate_copy_range_of_bytes,
+                    Rands(
+                        src_pos=util.AdaptiveRange(0, max_input_size),
+                        dst_pos=util.AdaptiveRange(1, max_input_size),
+                        length=util.AdaptiveRange(1, max_input_size),
+                    ),
+                ),
+                (
+                    _mutate_bit_flip,
+                    Rands(
+                        byte_pos=util.AdaptiveRange(0, max_input_size),
+                        bit_pos=util.AdaptiveRange(0, 7),
+                    ),
+                ),
+                (
+                    _mutate_flip_random_bits_of_random_byte,
+                    Rands(
+                        pos=util.AdaptiveRange(0, max_input_size),
+                        value=util.AdaptiveRange(0, 255),
+                    ),
+                ),
+                (
+                    _mutate_swap_two_bytes,
+                    Rands(
+                        first_pos=util.AdaptiveRange(0, max_input_size),
+                        second_pos=util.AdaptiveRange(0, max_input_size),
+                    ),
+                ),
+                (
+                    _mutate_add_subtract_from_a_byte,
+                    Rands(
+                        pos=util.AdaptiveRange(0, max_input_size),
+                        value=util.AdaptiveRange(0, 255),
+                    ),
+                ),
+                (
+                    _mutate_add_subtract_from_a_uint16,
+                    Rands(
+                        pos=util.AdaptiveRange(0, max_input_size),
+                        value=util.AdaptiveLargeRange(0, 2**16 - 1),
+                        big_endian=util.AdaptiveRange(0, 1),
+                    ),
+                ),
+                (
+                    _mutate_add_subtract_from_a_uint32,
+                    Rands(
+                        pos=util.AdaptiveRange(0, max_input_size),
+                        value=util.AdaptiveLargeRange(0, 2**32 - 1),
+                        big_endian=util.AdaptiveRange(0, 1),
+                    ),
+                ),
+                (
+                    _mutate_add_subtract_from_a_uint64,
+                    Rands(
+                        pos=util.AdaptiveRange(0, max_input_size),
+                        value=util.AdaptiveLargeRange(0, 2**64 - 1),
+                        big_endian=util.AdaptiveRange(0, 1),
+                    ),
+                ),
+                (
+                    _mutate_replace_a_byte_with_an_interesting_value,
+                    Rands(
+                        pos=util.AdaptiveRange(0, max_input_size),
+                        interesting_8=util.AdaptiveIntChoice(
+                            population=[1, 1, 16, 32, 64, 100, 127, 128, 129, 255],
+                        ),
+                    ),
+                ),
+                (
+                    _mutate_replace_an_uint16_with_an_interesting_value,
+                    Rands(
+                        pos=util.AdaptiveRange(0, max_input_size),
+                        interesting_16=util.AdaptiveIntChoice(
+                            population=[0, 128, 255, 256, 512, 1000, 1024, 4096, 32767, 65535],
+                        ),
+                        big_endian=util.AdaptiveRange(0, 1),
+                    ),
+                ),
+                (
+                    _mutate_replace_an_uint32_with_an_interesting_value,
+                    Rands(
+                        pos=util.AdaptiveRange(0, max_input_size),
+                        interesting_32=util.AdaptiveIntChoice(
+                            population=[
+                                0,
+                                1,
+                                32768,
+                                65535,
+                                65536,
+                                100663045,
+                                2147483647,
+                                4294967295,
+                            ],
+                        ),
+                        big_endian=util.AdaptiveRange(0, 1),
+                    ),
+                ),
+                (
+                    _mutate_replace_an_ascii_digit_with_another_digit,
+                    Rands(
+                        pos=util.AdaptiveRange(0, max_input_size),
+                        digits=util.AdaptiveIntChoice(
+                            population=[
+                                ord(i) for i in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
+                            ],
+                        ),
+                    ),
+                ),
+            ],
+        )
+        self._last_modify: Optional[Callable[[bytearray, Rands], None]] = None
+        self._last_rands: Optional[Rands] = None
 
     def mutate(self, buf: bytearray) -> bytearray:
         res = buf[:]
         nm = self._modifications.sample()
         while nm:
-            # TODO(senier): Use adaptive choice
-            modify, rands = random.choice(self._mutators)  # noqa: S311
+            self._last_modify, self._last_rands = self._mutators.sample()
             try:
-                modify(res, rands)
+                self._last_modify(res, self._last_rands)
             except OutOfDataError:
                 pass
             else:
