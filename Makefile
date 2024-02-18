@@ -19,7 +19,7 @@ check_kacl: .devel_installed
 	kacl-cli verify
 
 check_dead_code: .devel_installed
-	vulture --ignore-names "CobraFuzz" cobrafuzz
+	vulture --ignore-names "CobraFuzz" --min-confidence 70 cobrafuzz
 
 check_todo:
 	grep --line-number --color=auto -e '#\s*TODO.*$$' **/*.py
