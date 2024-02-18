@@ -11,7 +11,54 @@ class OutOfBoundsError(Exception):
 PopulationType = TypeVar("PopulationType")
 
 
-class AdaptiveChoiceBase(Generic[PopulationType]):
+class AdaptiveRandBase(Generic[PopulationType]):
+    def sample(self) -> PopulationType:
+        raise NotImplementedError
+
+    def success(self) -> None:
+        raise NotImplementedError
+
+    def fail(self) -> None:
+        raise NotImplementedError
+
+
+class AdaptiveLargeRange(AdaptiveRandBase[int]):
+    def __init__(self, lower: int, upper: int) -> None:
+        self._lower = lower
+        self._upper = upper
+        self._population: list[Optional[int]] = [None]
+        self._distribution: list[int] = [1]
+        self._last: Optional[int] = None
+
+    def sample(self) -> int:
+        self._last = random.choices(self._population, self._distribution, k=1)[0]  # noqa: S311
+        if self._last is None:
+            self._last = random.randint(self._lower, self._upper)  # noqa: S311
+        return self._last
+
+    def succeed(self) -> None:
+        if self._last in self._population:
+            self._distribution[self._population.index(self._last)] += 1
+        else:
+            self._population.append(self._last)
+            self._distribution.append(0)
+
+        self._distribution[0] += 1
+
+    def fail(self) -> None:
+        if self._last not in self._population:
+            return
+
+        index = self._population.index(self._last)
+        if self._distribution[index] <= 1:
+            del self._distribution[index]
+            del self._population[index]
+        else:
+            self._distribution[index] -= 1
+        self._distribution[0] -= 1
+
+
+class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
     def __init__(self, population: list[PopulationType]) -> None:
         self._population = population
         self._distribution = [1.0 for _ in self._population]
@@ -25,10 +72,16 @@ class AdaptiveChoiceBase(Generic[PopulationType]):
         self._last = random.choices(self._population, self._distribution, k=1)[0]  # noqa: S311
         return self._last
 
-    def update(self, adapt: float) -> None:
+    def success(self) -> None:
         if self._last is None:
             raise OutOfBoundsError("Update without previous sample")
-        self._distribution[self._population.index(self._last)] *= adapt
+        self._distribution[self._population.index(self._last)] *= 1.1
+        self._normalize_distribution()
+
+    def fail(self) -> None:
+        if self._last is None:
+            raise OutOfBoundsError("Update without previous sample")
+        self._distribution[self._population.index(self._last)] *= 0.9
         self._normalize_distribution()
 
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import random
 import secrets
 
 import pytest
@@ -342,7 +341,6 @@ def test_mutate_add_subtract_from_a_uint16_fail() -> None:
     ],
 )
 def test_mutate_add_subtract_from_a_uint16_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     position: int,
     value: int,
@@ -351,16 +349,14 @@ def test_mutate_add_subtract_from_a_uint16_success(
 ) -> None:
     tmp = bytearray(data)
 
-    with monkeypatch.context() as mp:
-        mp.setattr(random, "randint", lambda _a, _b: value)
-        mutator._mutate_add_subtract_from_a_uint16(  # noqa: SLF001
-            tmp,
-            mutator.Rands(
-                value=StaticRand(value),
-                pos=StaticRand(position),
-                big_endian=StaticRand(0 if little_endian else 1),
-            ),
-        )
+    mutator._mutate_add_subtract_from_a_uint16(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            value=StaticRand(value),
+            pos=StaticRand(position),
+            big_endian=StaticRand(0 if little_endian else 1),
+        ),
+    )
     assert tmp == expected
 
 
@@ -381,7 +377,6 @@ def test_mutate_add_subtract_from_a_uint32_fail() -> None:
     ],
 )
 def test_mutate_add_subtract_from_a_uint32_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     position: int,
     value: int,
@@ -390,16 +385,14 @@ def test_mutate_add_subtract_from_a_uint32_success(
 ) -> None:
     tmp = bytearray(data)
 
-    with monkeypatch.context() as mp:
-        mp.setattr(random, "randint", lambda _a, _b: value)
-        mutator._mutate_add_subtract_from_a_uint32(  # noqa: SLF001
-            tmp,
-            mutator.Rands(
-                value=StaticRand(value),
-                pos=StaticRand(position),
-                big_endian=StaticRand(0 if little_endian else 1),
-            ),
-        )
+    mutator._mutate_add_subtract_from_a_uint32(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            value=StaticRand(value),
+            pos=StaticRand(position),
+            big_endian=StaticRand(0 if little_endian else 1),
+        ),
+    )
     assert tmp == expected
 
 
@@ -420,7 +413,6 @@ def test_mutate_add_subtract_from_a_uint64_fail() -> None:
     ],
 )
 def test_mutate_add_subtract_from_a_uint64_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     position: int,
     value: int,
@@ -429,16 +421,14 @@ def test_mutate_add_subtract_from_a_uint64_success(
 ) -> None:
     tmp = bytearray(data)
 
-    with monkeypatch.context() as mp:
-        mp.setattr(random, "randint", lambda _a, _b: value)
-        mutator._mutate_add_subtract_from_a_uint64(  # noqa: SLF001
-            tmp,
-            mutator.Rands(
-                value=StaticRand(value),
-                pos=StaticRand(position),
-                big_endian=StaticRand(0 if little_endian else 1),
-            ),
-        )
+    mutator._mutate_add_subtract_from_a_uint64(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            value=StaticRand(value),
+            pos=StaticRand(position),
+            big_endian=StaticRand(0 if little_endian else 1),
+        ),
+    )
     assert tmp == expected
 
 

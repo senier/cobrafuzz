@@ -123,7 +123,12 @@ def test_adaptive_rand_invalid_update_without_sample() -> None:
         util.OutOfBoundsError,
         match=r"^Update without previous sample$",
     ):
-        r.update(1.0)
+        r.success()
+    with pytest.raises(
+        util.OutOfBoundsError,
+        match=r"^Update without previous sample$",
+    ):
+        r.fail()
 
 
 def test_adaptive_rand_in_range() -> None:
@@ -146,7 +151,10 @@ def test_adaptive_rand_update() -> None:
     r = util.AdaptiveRange(lower=0, upper=10)
     for _ in range(100000):
         value = r.sample()
-        r.update(0.9 if value <= 5 else 1.1)
+        if value <= 5:
+            r.fail()
+        else:
+            r.success()
     data = [r.sample() for _ in range(1, 100000)]
     assert all(d > 5 for d in data)
 
@@ -155,6 +163,48 @@ def test_adaptive_choice_update() -> None:
     r = util.AdaptiveChoiceBase(population=["a", "b", "c"])
     for _ in range(100000):
         value = r.sample()
-        r.update(0.9 if value == "a" else 1.1)
+        if value == "a":
+            r.fail()
+        else:
+            r.success()
     data = [r.sample() for _ in range(1, 100000)]
     assert all(d != "a" for d in data)
+
+
+def test_large_adaptive_range_uniform() -> None:
+    r = util.AdaptiveLargeRange(0, 2**16 - 1)
+    data = [r.sample() for _ in range(1, 10000)]
+    result = chisquare(f_obs=list(np.bincount(data)))
+    assert result.pvalue > 0.05
+
+
+def test_large_adaptive_range_update() -> None:
+    upper = 100
+    r = util.AdaptiveLargeRange(1, upper)
+    for _ in range(1, 100000):
+        value = r.sample()
+        if value < upper / 2:
+            r.succeed()
+        else:
+            r.fail()
+    data = [r.sample() for _ in range(1, upper)]
+    assert len([d for d in data if d < upper / 2]) / len(data) >= 2 / 3
+
+
+def test_large_adaptive_range_preferred_value() -> None:
+    r = util.AdaptiveLargeRange(1, 10)
+    for _ in range(1, 100000):
+        value = r.sample()
+        if value == 5:
+            r.succeed()
+        else:
+            r.fail()
+    assert len([d for d in [r.sample() for _ in range(1, 10000)] if d == 5]) > 5000
+
+    for _ in range(1, 1000000):
+        value = r.sample()
+        if value != 5:
+            r.succeed()
+        else:
+            r.fail()
+    assert len([d for d in [r.sample() for _ in range(1, 10000)] if d == 5]) < 2000
