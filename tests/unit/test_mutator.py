@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import secrets
-
 import pytest
 
 from cobrafuzz import mutator, util
@@ -88,7 +86,6 @@ def test_mutate_remove_range_of_bytes_success(
     ],
 )
 def test_mutate_insert_range_of_bytes_success(
-    monkeypatch: pytest.MonkeyPatch,
     data: bytes,
     start: int,
     length: int,
@@ -96,16 +93,15 @@ def test_mutate_insert_range_of_bytes_success(
 ) -> None:
     tmp = bytearray(data)
 
-    with monkeypatch.context() as mp:
-        mp.setattr(secrets, "token_bytes", lambda n: n * b"X")
-        mutator._mutate_insert_range_of_bytes(  # noqa: SLF001
-            tmp,
-            mutator.Rands(
-                start=StaticRand(start),
-                length=StaticRand(length),
-            ),
-        )
-        assert tmp == expected
+    mutator._mutate_insert_range_of_bytes(  # noqa: SLF001
+        tmp,
+        mutator.Rands(
+            start=StaticRand(start),
+            length=StaticRand(length),
+            data=StaticRand(ord("X")),
+        ),
+    )
+    assert tmp == expected
 
 
 def test_mutate_duplicate_range_of_bytes_fail() -> None:
