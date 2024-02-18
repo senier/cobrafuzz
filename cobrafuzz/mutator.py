@@ -13,10 +13,10 @@ class OutOfDataError(Exception):
 
 
 class Rands:
-    def __init__(self, **kwargs: util.AdaptiveIntChoice):
-        self._data: dict[str, util.AdaptiveIntChoice] = kwargs
+    def __init__(self, **kwargs: util.AdaptiveRandBase[int]):
+        self._data: dict[str, util.AdaptiveRandBase[int]] = kwargs
 
-    def __getattr__(self, attr: str) -> util.AdaptiveIntChoice:
+    def __getattr__(self, attr: str) -> util.AdaptiveRandBase[int]:
         if attr.startswith("_") or attr not in self._data:
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
         return self._data[attr]
@@ -107,8 +107,7 @@ def _mutate_add_subtract_from_a_uint16(res: bytearray, rand: Rands) -> None:
         raise OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     pos = rand.pos.sample_max(len(res) - 1)
-    # TODO(senier): Implement Rand suitable for large numbers
-    v_int = random.randint(0, 2**16 - 1)  # noqa: S311
+    v_int = rand.value.sample()
     v = struct.pack(">H", v_int) if rand.big_endian.sample() else struct.pack("<H", v_int)
     # TODO(#18): Implement version performing 16-bit addition
     res[pos] = (res[pos] + v[0]) % 256
@@ -120,8 +119,7 @@ def _mutate_add_subtract_from_a_uint32(res: bytearray, rand: Rands) -> None:
         raise OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     pos = rand.pos.sample_max(len(res) - 3)
-    # TODO(senier): Implement Rand suitable for large numbers
-    v_int = random.randint(0, 2**32 - 1)  # noqa: S311
+    v_int = rand.value.sample()
     v = struct.pack(">I", v_int) if rand.big_endian.sample() else struct.pack("<I", v_int)
     res[pos] = (res[pos] + v[0]) % 256
     res[pos + 1] = (res[pos + 1] + v[1]) % 256
@@ -134,8 +132,7 @@ def _mutate_add_subtract_from_a_uint64(res: bytearray, rand: Rands) -> None:
         raise OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     pos = rand.pos.sample_max(len(res) - 7)
-    # TODO(senier): Implement Rand suitable for large numbers
-    v_int = random.randint(0, 2**64 - 1)  # noqa: S311
+    v_int = rand.value.sample()
     v = struct.pack(">Q", v_int) if rand.big_endian.sample() else struct.pack("<Q", v_int)
     res[pos] = (res[pos] + v[0]) % 256
     res[pos + 1] = (res[pos + 1] + v[1]) % 256
@@ -255,6 +252,7 @@ class Mutator:
                 _mutate_add_subtract_from_a_uint16,
                 Rands(
                     pos=util.AdaptiveRange(0, max_input_size),
+                    value=util.AdaptiveLargeRange(0, 2**16 - 1),
                     big_endian=util.AdaptiveRange(0, 1),
                 ),
             ),
@@ -262,6 +260,7 @@ class Mutator:
                 _mutate_add_subtract_from_a_uint32,
                 Rands(
                     pos=util.AdaptiveRange(0, max_input_size),
+                    value=util.AdaptiveLargeRange(0, 2**32 - 1),
                     big_endian=util.AdaptiveRange(0, 1),
                 ),
             ),
@@ -269,6 +268,7 @@ class Mutator:
                 _mutate_add_subtract_from_a_uint64,
                 Rands(
                     pos=util.AdaptiveRange(0, max_input_size),
+                    value=util.AdaptiveLargeRange(0, 2**64 - 1),
                     big_endian=util.AdaptiveRange(0, 1),
                 ),
             ),
