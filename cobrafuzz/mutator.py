@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import random
-import secrets
 import struct
 from typing import Callable
 
@@ -34,8 +33,8 @@ def _mutate_remove_range_of_bytes(res: bytearray, rand: Rands) -> None:
 def _mutate_insert_range_of_bytes(res: bytearray, rand: Rands) -> None:
     assert isinstance(rand.length, util.AdaptiveRange)
     assert isinstance(rand.start, util.AdaptiveRange)
-    # TODO(senier): Replace secrets.token_bytes by a Rand
-    data = secrets.token_bytes(rand.length.sample())
+    assert isinstance(rand.data, util.AdaptiveRange)
+    data = bytes(rand.data.sample() for _ in range(rand.length.sample()))
     util.insert(data=res, start=rand.start.sample_max(len(res) + 1), data_to_insert=data)
 
 
@@ -202,6 +201,7 @@ class Mutator:
                 Rands(
                     length=util.AdaptiveRange(1, 10),
                     start=util.AdaptiveRange(0, max_input_size),
+                    data=util.AdaptiveRange(0, 255),
                 ),
             ),
             (
