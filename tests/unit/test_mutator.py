@@ -23,7 +23,7 @@ def test_mutate(monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as mp:
         mp.setattr(m, "_mutators", util.AdaptiveChoiceBase([(modify, None)]))
         mp.setattr(m, "_modifications", StaticRand(1))
-        assert m.mutate(bytearray(b"0123456789")) == bytearray(b"a0123456789b")
+        assert m._mutate(bytearray(b"0123456789")) == bytearray(b"a0123456789b")  # noqa: SLF001
 
 
 def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -35,14 +35,14 @@ def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with monkeypatch.context() as mp:
         mp.setattr(m, "_mutators", util.AdaptiveChoiceBase([(modify, None)]))
-        assert m.mutate(bytearray(b"0123456789")) == bytearray(b"\x00123456789")
+        assert m._mutate(bytearray(b"0123456789")) == bytearray(b"\x00123456789")  # noqa: SLF001
 
 
 def test_mutate_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
     m = mutator.Mutator(max_input_size=4)
     with monkeypatch.context() as mp:
         mp.setattr(m, "_mutators", util.AdaptiveChoiceBase([(lambda _data, _: None, None)]))
-        assert m.mutate(bytearray(b"0123456789")) == bytearray(b"0123")
+        assert m._mutate(bytearray(b"0123456789")) == bytearray(b"0123")  # noqa: SLF001
 
 
 def test_mutate_remove_range_of_bytes_fail() -> None:

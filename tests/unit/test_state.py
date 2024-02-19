@@ -68,7 +68,7 @@ def test_generate_input(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
         f.write(b"deadbeef")
     c = state.State(seeds=[filename])
     with monkeypatch.context() as mp:
-        mp.setattr(c._mutator, "mutate", lambda buf: buf)  # noqa: SLF001
+        mp.setattr(c._mutator, "_mutate", lambda buf: buf)  # noqa: SLF001
         assert c.get_input() == bytearray(b"deadbeef")
         assert c.get_input() == bytearray(b"deadbeef")
 
