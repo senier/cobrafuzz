@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import ast
 import json
 import logging
-import secrets
 from pathlib import Path
 from typing import Optional
 
@@ -26,7 +24,6 @@ class State:
         self._VERSION = 1
         self._max_input_size = max_input_size
         self._covered: set[tuple[Optional[str], Optional[int], str, int]] = set()
-        self._inputs: list[bytearray] = []
         self._file = file
         self._mutator = mutator.Mutator(max_input_size=max_input_size)
 
@@ -34,11 +31,11 @@ class State:
             f for p in seeds if p.is_dir() for f in p.glob("*") if f.is_file()
         ]:
             with path.open("rb") as f:
-                self._inputs.append(bytearray(f.read()))
+                self._mutator.put_input(bytearray(f.read()))
 
-        self._num_seeds = len(self._inputs)
-        if not self._inputs:
-            self._inputs.append(bytearray(0))
+        self._num_seeds = self._mutator.input_length()
+        if not self._num_seeds:
+            self._mutator.put_input(bytearray(0))
         self._load()
 
     @property
@@ -57,7 +54,7 @@ class State:
                         f"Invalid version in state file {self._file} (expected {self._VERSION})",
                     )
                 self._covered |= {tuple(e) for e in data["coverage"]}
-                self._inputs.extend(bytearray(ast.literal_eval(i)) for i in data["population"])
+                self._mutator.restore(data["population"])
         except FileNotFoundError:
             pass
         except (json.JSONDecodeError, TypeError):
@@ -75,7 +72,7 @@ class State:
                 obj={
                     "version": self._VERSION,
                     "coverage": list(self._covered),
-                    "population": [str(bytes(i)) for i in self._inputs],
+                    "population": self._mutator.dump(),
                 },
                 fp=sf,
                 ensure_ascii=True,
@@ -105,13 +102,10 @@ class State:
 
     @property
     def size(self) -> int:
-        return len(self._inputs)
+        return self._mutator.input_length()
 
     def put_input(self, buf: bytearray) -> None:
-        self._inputs.append(buf)
+        self._mutator.put_input(buf)
 
     def get_input(self) -> bytearray:
-        return self._mutator.mutate(
-            # TODO(senier): Replace my stateful interface inside mutator, remove use of util.rand
-            buf=list(self._inputs)[secrets.randbelow(len(self._inputs))],
-        )
+        return self._mutator.get_input()
