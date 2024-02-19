@@ -17,7 +17,7 @@ def test_add_file_constructor(tmp_path: Path) -> None:
     with filename.open("wb") as f:
         f.write(b"deadbeef")
     c = state.State(seeds=[filename])
-    assert c._mutator._inputs == [bytearray(b"deadbeef")]  # noqa: SLF001
+    assert list(c._mutator._inputs) == [bytearray(b"deadbeef")]  # noqa: SLF001
 
 
 def test_add_files_constructor(tmp_path: Path) -> None:
@@ -42,20 +42,20 @@ def test_add_files_constructor(tmp_path: Path) -> None:
 def test_put_state_not_saved() -> None:
     c = state.State()
     c.put_input(bytearray(b"deadbeef"))
-    assert c._mutator._inputs == [bytearray(0), bytearray(b"deadbeef")]  # noqa: SLF001
+    assert list(c._mutator._inputs) == [bytearray(0), bytearray(b"deadbeef")]  # noqa: SLF001
 
 
 def test_put_state_saved(tmp_path: Path) -> None:
     statefile = tmp_path / "state.json"
     c1 = state.State(file=statefile)
     c1.put_input(bytearray(b"deadbeef"))
-    assert c1._mutator._inputs == [bytearray(0), bytearray(b"deadbeef")]  # noqa: SLF001
+    assert list(c1._mutator._inputs) == [bytearray(0), bytearray(b"deadbeef")]  # noqa: SLF001
 
     c1.save()
     assert statefile.exists()
 
     c2 = state.State(file=statefile)
-    assert c2._mutator._inputs == [  # noqa: SLF001
+    assert list(c2._mutator._inputs) == [  # noqa: SLF001
         bytearray(0),
         bytearray(0),
         bytearray(b"deadbeef"),

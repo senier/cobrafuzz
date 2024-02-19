@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import secrets
 import struct
 from typing import Callable, Optional
 
@@ -187,7 +186,7 @@ def _mutate_replace_an_ascii_digit_with_another_digit(res: bytearray, rand: Rand
 
 class Mutator:
     def __init__(self, max_input_size: int = 1024, max_modifications: int = 10):
-        self._inputs: list[bytearray] = []
+        self._inputs: util.AdaptiveChoiceBase[bytearray] = util.AdaptiveChoiceBase(population=None)
         self._max_input_size = max_input_size
         self._modifications = util.AdaptiveRange(1, max_modifications)
         self._mutators: util.AdaptiveChoiceBase[
@@ -348,10 +347,7 @@ class Mutator:
         return res
 
     def get_input(self) -> bytearray:
-        return self._mutate(
-            # TODO(senier): Replace by stateful interface
-            buf=list(self._inputs)[secrets.randbelow(len(self._inputs))],
-        )
+        return self._mutate(self._inputs.sample())
 
     def put_input(self, buf: bytearray) -> None:
         self._inputs.append(buf)
