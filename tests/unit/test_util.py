@@ -117,18 +117,14 @@ def test_adaptive_rand_sample_below_invalid_bounds() -> None:
         r.sample_max(11)
 
 
-def test_adaptive_rand_invalid_update_without_sample() -> None:
+@pytest.mark.parametrize("success", [True, False])
+def test_adaptive_rand_invalid_update_without_sample(success: bool) -> None:
     r = util.AdaptiveRange(lower=0, upper=10)
     with pytest.raises(
         util.OutOfBoundsError,
         match=r"^Update without previous sample$",
     ):
-        r.success()
-    with pytest.raises(
-        util.OutOfBoundsError,
-        match=r"^Update without previous sample$",
-    ):
-        r.fail()
+        r.update(success=success)
 
 
 def test_adaptive_rand_in_range() -> None:
@@ -150,11 +146,7 @@ def test_adaptive_rand_uniform() -> None:
 def test_adaptive_rand_update() -> None:
     r = util.AdaptiveRange(lower=0, upper=10)
     for _ in range(100000):
-        value = r.sample()
-        if value <= 5:
-            r.fail()
-        else:
-            r.success()
+        r.update(success=r.sample() > 5)
     data = [r.sample() for _ in range(1, 100000)]
     assert all(d > 5 for d in data)
 
@@ -162,11 +154,7 @@ def test_adaptive_rand_update() -> None:
 def test_adaptive_choice_update() -> None:
     r = util.AdaptiveChoiceBase(population=["a", "b", "c"])
     for _ in range(100000):
-        value = r.sample()
-        if value == "a":
-            r.fail()
-        else:
-            r.success()
+        r.update(success=r.sample() != "a")
     data = [r.sample() for _ in range(1, 100000)]
     assert all(d != "a" for d in data)
 
@@ -182,11 +170,7 @@ def test_large_adaptive_range_update() -> None:
     upper = 100
     r = util.AdaptiveLargeRange(1, upper)
     for _ in range(1, 100000):
-        value = r.sample()
-        if value < upper / 2:
-            r.succeed()
-        else:
-            r.fail()
+        r.update(success=r.sample() < upper / 2)
     data = [r.sample() for _ in range(1, upper)]
     assert len([d for d in data if d < upper / 2]) / len(data) >= 2 / 3
 
@@ -194,17 +178,9 @@ def test_large_adaptive_range_update() -> None:
 def test_large_adaptive_range_preferred_value() -> None:
     r = util.AdaptiveLargeRange(1, 10)
     for _ in range(1, 100000):
-        value = r.sample()
-        if value == 5:
-            r.succeed()
-        else:
-            r.fail()
+        r.update(success=r.sample() == 5)
     assert len([d for d in [r.sample() for _ in range(1, 10000)] if d == 5]) > 5000
 
     for _ in range(1, 1000000):
-        value = r.sample()
-        if value != 5:
-            r.succeed()
-        else:
-            r.fail()
+        r.update(success=r.sample() != 5)
     assert len([d for d in [r.sample() for _ in range(1, 10000)] if d == 5]) < 2000

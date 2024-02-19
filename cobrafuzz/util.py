@@ -12,14 +12,20 @@ PopulationType = TypeVar("PopulationType")
 
 
 class AdaptiveRandBase(Generic[PopulationType]):
+    def _succeed(self) -> None:
+        raise NotImplementedError
+
+    def _fail(self) -> None:
+        raise NotImplementedError
+
     def sample(self) -> PopulationType:
         raise NotImplementedError
 
-    def success(self) -> None:
-        raise NotImplementedError
-
-    def fail(self) -> None:
-        raise NotImplementedError
+    def update(self, success: bool = False) -> None:
+        if success:
+            self._succeed()
+        else:
+            self._fail()
 
 
 class AdaptiveLargeRange(AdaptiveRandBase[int]):
@@ -30,13 +36,7 @@ class AdaptiveLargeRange(AdaptiveRandBase[int]):
         self._distribution: list[int] = [1]
         self._last: Optional[int] = None
 
-    def sample(self) -> int:
-        self._last = random.choices(self._population, self._distribution, k=1)[0]  # noqa: S311
-        if self._last is None:
-            self._last = random.randint(self._lower, self._upper)  # noqa: S311
-        return self._last
-
-    def succeed(self) -> None:
+    def _succeed(self) -> None:
         if self._last in self._population:
             self._distribution[self._population.index(self._last)] += 1
         else:
@@ -45,7 +45,7 @@ class AdaptiveLargeRange(AdaptiveRandBase[int]):
 
         self._distribution[0] += 1
 
-    def fail(self) -> None:
+    def _fail(self) -> None:
         if self._last not in self._population:
             return
 
@@ -56,6 +56,12 @@ class AdaptiveLargeRange(AdaptiveRandBase[int]):
         else:
             self._distribution[index] -= 1
         self._distribution[0] -= 1
+
+    def sample(self) -> int:
+        self._last = random.choices(self._population, self._distribution, k=1)[0]  # noqa: S311
+        if self._last is None:
+            self._last = random.randint(self._lower, self._upper)  # noqa: S311
+        return self._last
 
 
 class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
@@ -74,6 +80,18 @@ class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
         total = sum(self._distribution)
         self._distribution = [p / total for p in self._distribution]
 
+    def _succeed(self) -> None:
+        if self._last is None:
+            raise OutOfBoundsError("Update without previous sample")
+        self._distribution[self._population.index(self._last)] *= 1.1
+        self._normalize_distribution()
+
+    def _fail(self) -> None:
+        if self._last is None:
+            raise OutOfBoundsError("Update without previous sample")
+        self._distribution[self._population.index(self._last)] *= 0.9
+        self._normalize_distribution()
+
     def append(self, element: PopulationType) -> None:
         self._population.append(element)
         self._distribution.append(1.0)
@@ -81,18 +99,6 @@ class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
     def sample(self) -> PopulationType:
         self._last = random.choices(self._population, self._distribution, k=1)[0]  # noqa: S311
         return self._last
-
-    def success(self) -> None:
-        if self._last is None:
-            raise OutOfBoundsError("Update without previous sample")
-        self._distribution[self._population.index(self._last)] *= 1.1
-        self._normalize_distribution()
-
-    def fail(self) -> None:
-        if self._last is None:
-            raise OutOfBoundsError("Update without previous sample")
-        self._distribution[self._population.index(self._last)] *= 0.9
-        self._normalize_distribution()
 
 
 class AdaptiveIntChoice(AdaptiveChoiceBase[int]):
