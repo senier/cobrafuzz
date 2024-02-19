@@ -12,7 +12,7 @@ def _mutate(rounds: int) -> None:
     data = bytearray(b"start")
     start = time.time()
     for _ in range(rounds):
-        mutator.mutate(data)
+        mutator._mutate(data)  # noqa: SLF001
     duration = time.time() - start
     logging.info("mutate: %d/s", rounds // duration)
 

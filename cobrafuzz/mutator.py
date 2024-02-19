@@ -331,7 +331,7 @@ class Mutator:
         self._last_modify: Optional[Callable[[bytearray, Rands], None]] = None
         self._last_rands: Optional[Rands] = None
 
-    def mutate(self, buf: bytearray) -> bytearray:
+    def _mutate(self, buf: bytearray) -> bytearray:
         res = buf[:]
         nm = self._modifications.sample()
         while nm:
@@ -348,7 +348,7 @@ class Mutator:
         return res
 
     def get_input(self) -> bytearray:
-        return self.mutate(
+        return self._mutate(
             # TODO(senier): Replace by stateful interface
             buf=list(self._inputs)[secrets.randbelow(len(self._inputs))],
         )
