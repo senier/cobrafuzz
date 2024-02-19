@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from typing import Generic, Optional, TypeVar
+from typing import Generator, Generic, Optional, TypeVar
 
 
 class OutOfBoundsError(Exception):
@@ -59,14 +59,24 @@ class AdaptiveLargeRange(AdaptiveRandBase[int]):
 
 
 class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
-    def __init__(self, population: list[PopulationType]) -> None:
-        self._population = population
+    def __init__(self, population: Optional[list[PopulationType]]) -> None:
+        self._population = population or []
         self._distribution = [1.0 for _ in self._population]
         self._last: Optional[PopulationType] = None
+
+    def __len__(self) -> int:
+        return len(self._population)
+
+    def __iter__(self) -> Generator[PopulationType, None, None]:
+        yield from self._population
 
     def _normalize_distribution(self) -> None:
         total = sum(self._distribution)
         self._distribution = [p / total for p in self._distribution]
+
+    def append(self, element: PopulationType) -> None:
+        self._population.append(element)
+        self._distribution.append(1.0)
 
     def sample(self) -> PopulationType:
         self._last = random.choices(self._population, self._distribution, k=1)[0]  # noqa: S311
