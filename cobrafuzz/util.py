@@ -15,9 +15,6 @@ class AdaptiveRandBase(Generic[PopulationType]):
     def _fail(self) -> None:
         raise NotImplementedError
 
-    def sample(self) -> PopulationType:
-        raise NotImplementedError
-
     def update(self, success: bool = False) -> None:
         if success:
             self._succeed()
@@ -25,40 +22,47 @@ class AdaptiveRandBase(Generic[PopulationType]):
             self._fail()
 
 
-class AdaptiveLargeRange(AdaptiveRandBase[int]):
-    def __init__(self, lower: int, upper: int) -> None:
-        self._lower = lower
-        self._upper = upper
+class AdaptiveRange(AdaptiveRandBase[int]):
+    def __init__(self) -> None:
         self._population: list[Optional[int]] = [None]
         self._distribution: list[int] = [1]
-        self._last: Optional[int] = None
+        self._last_value: Optional[int] = None
+        self._last_index: int = 0
 
     def _succeed(self) -> None:
-        if self._last in self._population:
-            self._distribution[self._population.index(self._last)] += 1
+        if self._last_index:
+            self._distribution[self._last_index] += 1
         else:
-            self._population.append(self._last)
-            self._distribution.append(0)
+            self._population.append(self._last_value)
+            self._distribution.append(1)
 
         self._distribution[0] += 1
+        self._last_index = 0
 
     def _fail(self) -> None:
-        if self._last not in self._population:
+        if not self._last_index:
             return
 
-        index = self._population.index(self._last)
-        if self._distribution[index] <= 1:
-            del self._distribution[index]
-            del self._population[index]
+        if self._distribution[self._last_index] <= 1:
+            del self._distribution[self._last_index]
+            del self._population[self._last_index]
         else:
-            self._distribution[index] -= 1
-        self._distribution[0] -= 1
+            self._distribution[self._last_index] -= 1
 
-    def sample(self) -> int:
-        self._last = random.choices(self._population, self._distribution, k=1)[0]  # noqa: S311
-        if self._last is None:
-            self._last = random.randint(self._lower, self._upper)  # noqa: S311
-        return self._last
+        self._distribution[0] -= 1
+        self._last_index = 0
+
+    def sample(self, lower: int, upper: int) -> int:
+        if lower > upper:
+            raise common.OutOfBoundsError(
+                f"Lower bound must be lower than upper bound ({lower} > {upper})",
+            )
+        self._last_value = random.choices(self._population, self._distribution)[0]  # noqa: S311
+        if self._last_value is None or self._last_value < lower or self._last_value > upper:
+            self._last_value = random.randint(lower, upper)  # noqa: S311
+        else:
+            self._last_index = self._population.index(self._last_value)
+        return self._last_value
 
 
 class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
@@ -90,41 +94,6 @@ class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
 
     def sample(self) -> PopulationType:
         self._last = random.choices(self._population, self._distribution, k=1)[0]  # noqa: S311
-        return self._last
-
-
-class AdaptiveIntChoice(AdaptiveChoiceBase[int]):
-    pass
-
-
-class AdaptiveRange(AdaptiveIntChoice):
-    def __init__(self, lower: int, upper: int) -> None:
-        if lower > upper:
-            raise common.OutOfBoundsError(
-                f"Lower bound must be lower than upper bound ({lower} > {upper})",
-            )
-        super().__init__(list(range(lower, upper + 1)))
-        self._lower = lower
-        self._upper = upper
-
-    def sample_max(self, maximum: int) -> int:
-        if maximum < self._lower:
-            raise common.OutOfBoundsError(
-                f"Maximum must be greater than lower bound ({maximum} < {self._lower})",
-            )
-        if maximum > self._upper:
-            raise common.OutOfBoundsError(
-                f"Maximum must be smaller or equal to upper bound ({maximum} > {self._upper})",
-            )
-        if maximum == self._lower:
-            return self._lower
-
-        self._last = random.choices(  # noqa: S311
-            population=self._population[: maximum - self._lower],
-            weights=self._distribution[: maximum - self._lower],
-            k=1,
-        )[0]
-
         return self._last
 
 
