@@ -148,7 +148,7 @@ def _worker_run(  # noqa: PLR0913
                     runs=runs,
                     data=data,
                     covered=covered(e),
-                    message=f"{e.__class__.__name__}: {e}",
+                    message=f"{traceback.format_exc()}",
                 ),
             )
             runs = 0
