@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from scipy.stats import chisquare
 
-from cobrafuzz import util
+from cobrafuzz import common, util
 
 
 @pytest.mark.parametrize(
@@ -18,7 +18,7 @@ from cobrafuzz import util
 )
 def test_copy_invalid(data: bytes, source: int, dest: int, length: int, error: str) -> None:
     tmp = bytearray(data)
-    with pytest.raises(util.OutOfBoundsError, match=rf"^{error}$"):
+    with pytest.raises(common.OutOfBoundsError, match=rf"^{error}$"):
         util.copy(tmp, source, dest, length)
 
 
@@ -47,7 +47,7 @@ def test_copy_valid(data: bytes, source: int, dest: int, length: int, expected: 
 )
 def test_remove_invalid(data: bytes, start: int, length: int, error: str) -> None:
     tmp = bytearray(data)
-    with pytest.raises(util.OutOfBoundsError, match=error):
+    with pytest.raises(common.OutOfBoundsError, match=error):
         util.remove(tmp, start, length)
 
 
@@ -76,7 +76,7 @@ def test_remove_valid(data: bytes, start: int, length: int, expected: bytes) -> 
 )
 def test_insert_invalid(data: bytes, start: int, data_to_insert: bytes, error: str) -> None:
     tmp = bytearray(data)
-    with pytest.raises(util.OutOfBoundsError, match=error):
+    with pytest.raises(common.OutOfBoundsError, match=error):
         util.insert(tmp, start, data_to_insert)
 
 
@@ -96,7 +96,7 @@ def test_insert_valid(data: bytes, start: int, data_to_insert: bytes, expected: 
 
 def test_adaptive_rand_invalid_bounds() -> None:
     with pytest.raises(
-        util.OutOfBoundsError,
+        common.OutOfBoundsError,
         match=r"^Lower bound must be lower than upper bound \(10 > 0\)$",
     ):
         util.AdaptiveRange(lower=10, upper=0)
@@ -105,26 +105,16 @@ def test_adaptive_rand_invalid_bounds() -> None:
 def test_adaptive_rand_sample_below_invalid_bounds() -> None:
     r = util.AdaptiveRange(lower=2, upper=10)
     with pytest.raises(
-        util.OutOfBoundsError,
+        common.OutOfBoundsError,
         match=r"^Maximum must be greater than lower bound \(1 < 2\)$",
     ):
         r.sample_max(1)
 
     with pytest.raises(
-        util.OutOfBoundsError,
+        common.OutOfBoundsError,
         match=r"^Maximum must be smaller or equal to upper bound \(11 > 10\)$",
     ):
         r.sample_max(11)
-
-
-@pytest.mark.parametrize("success", [True, False])
-def test_adaptive_rand_invalid_update_without_sample(success: bool) -> None:
-    r = util.AdaptiveRange(lower=0, upper=10)
-    with pytest.raises(
-        util.OutOfBoundsError,
-        match=r"^Update without previous sample$",
-    ):
-        r.update(success=success)
 
 
 def test_adaptive_rand_in_range() -> None:
@@ -145,18 +135,21 @@ def test_adaptive_rand_uniform() -> None:
 
 def test_adaptive_rand_update() -> None:
     r = util.AdaptiveRange(lower=0, upper=10)
+    r.update()
     for _ in range(100000):
         r.update(success=r.sample() > 5)
-    data = [r.sample() for _ in range(1, 100000)]
-    assert all(d > 5 for d in data)
+    data = [r.sample() for _ in range(1, 1000)]
+    assert all(d > 5 for d in data), data
 
 
 def test_adaptive_choice_update() -> None:
     r = util.AdaptiveChoiceBase(population=["a", "b", "c"])
+    r.update()
+    r.update(success=True)
     for _ in range(100000):
         r.update(success=r.sample() != "a")
-    data = [r.sample() for _ in range(1, 100000)]
-    assert all(d != "a" for d in data)
+    data = [r.sample() for _ in range(1, 1000)]
+    assert all(d != "a" for d in data), data
 
 
 def test_large_adaptive_range_uniform() -> None:

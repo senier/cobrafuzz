@@ -153,6 +153,7 @@ def _worker_run(  # noqa: PLR0913
             )
             runs = 0
             last_status = time.time()
+            state.update(success=True)
         else:
             new_path = state.store_coverage(data=tracer.get_covered())
             if new_path:
@@ -161,10 +162,12 @@ def _worker_run(  # noqa: PLR0913
                 )
                 runs = 0
                 last_status = time.time()
+                state.update(success=True)
             elif time.time() - last_status > stat_frequency:
                 result_queue.put(Status(wid=wid, runs=runs))
                 runs = 0
                 last_status = time.time()
+                state.update(success=False)
 
 
 class Fuzzer:
