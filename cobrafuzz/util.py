@@ -3,10 +3,7 @@ from __future__ import annotations
 import random
 from typing import Generator, Generic, Optional, TypeVar
 
-
-class OutOfBoundsError(Exception):
-    pass
-
+from . import common
 
 PopulationType = TypeVar("PopulationType")
 
@@ -67,7 +64,7 @@ class AdaptiveLargeRange(AdaptiveRandBase[int]):
 class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
     def __init__(self, population: Optional[list[PopulationType]]) -> None:
         self._population = population or []
-        self._distribution = [1.0 for _ in self._population]
+        self._distribution = [1 for _ in self._population]
         self._last: Optional[PopulationType] = None
 
     def __len__(self) -> int:
@@ -76,25 +73,20 @@ class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
     def __iter__(self) -> Generator[PopulationType, None, None]:
         yield from self._population
 
-    def _normalize_distribution(self) -> None:
-        total = sum(self._distribution)
-        self._distribution = [p / total for p in self._distribution]
-
     def _succeed(self) -> None:
         if self._last is None:
-            raise OutOfBoundsError("Update without previous sample")
-        self._distribution[self._population.index(self._last)] *= 1.1
-        self._normalize_distribution()
+            return
+        self._distribution[self._population.index(self._last)] += 1
 
     def _fail(self) -> None:
         if self._last is None:
-            raise OutOfBoundsError("Update without previous sample")
-        self._distribution[self._population.index(self._last)] *= 0.9
-        self._normalize_distribution()
+            return
+        if self._distribution[self._population.index(self._last)] > 1:
+            self._distribution[self._population.index(self._last)] -= 1
 
     def append(self, element: PopulationType) -> None:
         self._population.append(element)
-        self._distribution.append(1.0)
+        self._distribution.append(1)
 
     def sample(self) -> PopulationType:
         self._last = random.choices(self._population, self._distribution, k=1)[0]  # noqa: S311
@@ -108,7 +100,7 @@ class AdaptiveIntChoice(AdaptiveChoiceBase[int]):
 class AdaptiveRange(AdaptiveIntChoice):
     def __init__(self, lower: int, upper: int) -> None:
         if lower > upper:
-            raise OutOfBoundsError(
+            raise common.OutOfBoundsError(
                 f"Lower bound must be lower than upper bound ({lower} > {upper})",
             )
         super().__init__(list(range(lower, upper + 1)))
@@ -117,11 +109,11 @@ class AdaptiveRange(AdaptiveIntChoice):
 
     def sample_max(self, maximum: int) -> int:
         if maximum < self._lower:
-            raise OutOfBoundsError(
+            raise common.OutOfBoundsError(
                 f"Maximum must be greater than lower bound ({maximum} < {self._lower})",
             )
         if maximum > self._upper:
-            raise OutOfBoundsError(
+            raise common.OutOfBoundsError(
                 f"Maximum must be smaller or equal to upper bound ({maximum} > {self._upper})",
             )
         if maximum == self._lower:
@@ -155,15 +147,15 @@ def copy(
     length = len(data) - source if length is None else length
 
     if source >= len(data):
-        raise OutOfBoundsError(f"Source out of range ({source=}, length={len(data)})")
+        raise common.OutOfBoundsError(f"Source out of range ({source=}, length={len(data)})")
     if source + length > len(data):
-        raise OutOfBoundsError(
+        raise common.OutOfBoundsError(
             f"Source end out of range (end={source + length - 1}, length={len(data)})",
         )
     if dest >= len(data):
-        raise OutOfBoundsError(f"Destination out of range ({dest=}, length={len(data)})")
+        raise common.OutOfBoundsError(f"Destination out of range ({dest=}, length={len(data)})")
     if dest + length > len(data):
-        raise OutOfBoundsError(
+        raise common.OutOfBoundsError(
             f"Destination end out of range (end={dest + length - 1}, length={len(data)})",
         )
     data[dest : dest + length] = data[source : source + length]
@@ -180,9 +172,11 @@ def remove(data: bytearray, start: int, length: int) -> None:
     length: Number of bytes to remove.
     """
     if start >= len(data):
-        raise OutOfBoundsError(f"Start out of range ({start=}, length={len(data)})")
+        raise common.OutOfBoundsError(f"Start out of range ({start=}, length={len(data)})")
     if start + length > len(data):
-        raise OutOfBoundsError(f"End out of range (end={start + length - 1}, length={len(data)})")
+        raise common.OutOfBoundsError(
+            f"End out of range (end={start + length - 1}, length={len(data)})",
+        )
     data[:] = data[:start] + data[start + length :]
 
 
@@ -197,5 +191,5 @@ def insert(data: bytearray, start: int, data_to_insert: bytes) -> None:
     data_to_insert: bytearray to insert.
     """
     if start > len(data):
-        raise OutOfBoundsError("Start out of range")
+        raise common.OutOfBoundsError("Start out of range")
     data[:] = data[:start] + data_to_insert + data[start:]

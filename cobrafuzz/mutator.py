@@ -4,11 +4,7 @@ import ast
 import struct
 from typing import Callable, Optional
 
-from . import util
-
-
-class OutOfDataError(Exception):
-    pass
+from . import common, util
 
 
 class Rands:
@@ -20,10 +16,14 @@ class Rands:
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
         return self._data[attr]
 
+    def update(self, success: bool = False) -> None:
+        for rand in self._data.values():
+            rand.update(success=success)
+
 
 def _mutate_remove_range_of_bytes(res: bytearray, rand: Rands) -> None:
     if len(res) < 2:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.length, util.AdaptiveRange)
     assert isinstance(rand.start, util.AdaptiveRange)
     length = rand.length.sample_max(len(res))
@@ -40,7 +40,7 @@ def _mutate_insert_range_of_bytes(res: bytearray, rand: Rands) -> None:
 
 def _mutate_duplicate_range_of_bytes(res: bytearray, rand: Rands) -> None:
     if len(res) < 2:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.src_pos, util.AdaptiveRange)
     assert isinstance(rand.dst_pos, util.AdaptiveRange)
     assert isinstance(rand.length, util.AdaptiveRange)
@@ -52,7 +52,7 @@ def _mutate_duplicate_range_of_bytes(res: bytearray, rand: Rands) -> None:
 
 def _mutate_copy_range_of_bytes(res: bytearray, rand: Rands) -> None:
     if len(res) < 2:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.src_pos, util.AdaptiveRange)
     assert isinstance(rand.dst_pos, util.AdaptiveRange)
     assert isinstance(rand.length, util.AdaptiveRange)
@@ -64,7 +64,7 @@ def _mutate_copy_range_of_bytes(res: bytearray, rand: Rands) -> None:
 
 def _mutate_bit_flip(res: bytearray, rand: Rands) -> None:
     if len(res) < 1:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.byte_pos, util.AdaptiveRange)
     assert isinstance(rand.bit_pos, util.AdaptiveRange)
     byte_pos = rand.byte_pos.sample_max(len(res))
@@ -74,7 +74,7 @@ def _mutate_bit_flip(res: bytearray, rand: Rands) -> None:
 
 def _mutate_flip_random_bits_of_random_byte(res: bytearray, rand: Rands) -> None:
     if len(res) < 1:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     assert isinstance(rand.value, util.AdaptiveRange)
     pos = rand.pos.sample_max(len(res))
@@ -83,7 +83,7 @@ def _mutate_flip_random_bits_of_random_byte(res: bytearray, rand: Rands) -> None
 
 def _mutate_swap_two_bytes(res: bytearray, rand: Rands) -> None:
     if len(res) < 2:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.first_pos, util.AdaptiveRange)
     assert isinstance(rand.second_pos, util.AdaptiveRange)
     first_pos = rand.first_pos.sample_max(len(res))
@@ -93,7 +93,7 @@ def _mutate_swap_two_bytes(res: bytearray, rand: Rands) -> None:
 
 def _mutate_add_subtract_from_a_byte(res: bytearray, rand: Rands) -> None:
     if len(res) < 1:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     assert isinstance(rand.value, util.AdaptiveRange)
     pos = rand.pos.sample_max(len(res))
@@ -103,7 +103,7 @@ def _mutate_add_subtract_from_a_byte(res: bytearray, rand: Rands) -> None:
 
 def _mutate_add_subtract_from_a_uint16(res: bytearray, rand: Rands) -> None:
     if len(res) < 2:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     pos = rand.pos.sample_max(len(res) - 1)
     v_int = rand.value.sample()
@@ -115,7 +115,7 @@ def _mutate_add_subtract_from_a_uint16(res: bytearray, rand: Rands) -> None:
 
 def _mutate_add_subtract_from_a_uint32(res: bytearray, rand: Rands) -> None:
     if len(res) < 4:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     pos = rand.pos.sample_max(len(res) - 3)
     v_int = rand.value.sample()
@@ -128,7 +128,7 @@ def _mutate_add_subtract_from_a_uint32(res: bytearray, rand: Rands) -> None:
 
 def _mutate_add_subtract_from_a_uint64(res: bytearray, rand: Rands) -> None:
     if len(res) < 8:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     pos = rand.pos.sample_max(len(res) - 7)
     v_int = rand.value.sample()
@@ -145,7 +145,7 @@ def _mutate_add_subtract_from_a_uint64(res: bytearray, rand: Rands) -> None:
 
 def _mutate_replace_a_byte_with_an_interesting_value(res: bytearray, rand: Rands) -> None:
     if len(res) < 1:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     pos = rand.pos.sample_max(len(res))
     res[pos] = rand.interesting_8.sample()
@@ -153,7 +153,7 @@ def _mutate_replace_a_byte_with_an_interesting_value(res: bytearray, rand: Rands
 
 def _mutate_replace_an_uint16_with_an_interesting_value(res: bytearray, rand: Rands) -> None:
     if len(res) < 2:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     pos = rand.pos.sample_max(len(res) - 1)
     v_int = rand.interesting_16.sample()
@@ -164,7 +164,7 @@ def _mutate_replace_an_uint16_with_an_interesting_value(res: bytearray, rand: Ra
 
 def _mutate_replace_an_uint32_with_an_interesting_value(res: bytearray, rand: Rands) -> None:
     if len(res) < 4:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     pos = rand.pos.sample_max(len(res) - 3)
     v_int = rand.interesting_32.sample()
@@ -178,7 +178,7 @@ def _mutate_replace_an_uint32_with_an_interesting_value(res: bytearray, rand: Ra
 def _mutate_replace_an_ascii_digit_with_another_digit(res: bytearray, rand: Rands) -> None:
     digits_present = [i for i in range(len(res)) if ord("0") <= res[i] <= ord("9")]
     if len(digits_present) < 1:
-        raise OutOfDataError
+        raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     pos = rand.pos.sample_max(len(res))
     res[pos] = rand.digits.sample()
@@ -327,17 +327,16 @@ class Mutator:
                 ),
             ],
         )
-        self._last_modify: Optional[Callable[[bytearray, Rands], None]] = None
         self._last_rands: Optional[Rands] = None
 
     def _mutate(self, buf: bytearray) -> bytearray:
         res = buf[:]
         nm = self._modifications.sample()
         while nm:
-            self._last_modify, self._last_rands = self._mutators.sample()
+            modify, self._last_rands = self._mutators.sample()
             try:
-                self._last_modify(res, self._last_rands)
-            except OutOfDataError:
+                modify(res, self._last_rands)
+            except common.OutOfDataError:
                 pass
             else:
                 nm -= 1
@@ -361,3 +360,10 @@ class Mutator:
 
     def dump(self) -> list[str]:
         return [str(bytes(i)) for i in self._inputs]
+
+    def update(self, success: bool = False) -> None:
+        if self._last_rands is not None:
+            self._last_rands.update(success=success)
+        self._inputs.update(success=success)
+        self._modifications.update(success=success)
+        self._mutators.update(success=success)

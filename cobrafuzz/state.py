@@ -38,10 +38,6 @@ class State:
             self._mutator.put_input(bytearray(0))
         self._load()
 
-    @property
-    def num_seeds(self) -> int:
-        return self._num_seeds
-
     def _load(self) -> None:
         if not self._file:
             return
@@ -63,6 +59,10 @@ class State:
         except OSError as e:
             logging.info("Error opening state file: %s", e)
             self._file = None
+
+    @property
+    def num_seeds(self) -> int:
+        return self._num_seeds
 
     def save(self) -> None:
         if not self._file:
@@ -109,3 +109,6 @@ class State:
 
     def get_input(self) -> bytearray:
         return self._mutator.get_input()
+
+    def update(self, success: bool = False) -> None:
+        self._mutator.update(success=success)

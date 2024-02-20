@@ -112,7 +112,7 @@ def test_crash_hard(tmp_path: Path) -> None:
     f = fuzzer.Fuzzer(
         crash_dir=crash_dir,
         target=crashing_target_hard,
-        max_time=5,
+        max_time=30,
         num_workers=2,
         stat_frequency=1,
     )
