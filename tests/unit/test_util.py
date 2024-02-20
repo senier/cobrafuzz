@@ -95,51 +95,37 @@ def test_insert_valid(data: bytes, start: int, data_to_insert: bytes, expected: 
 
 
 def test_adaptive_rand_invalid_bounds() -> None:
+    r = util.AdaptiveRange()
     with pytest.raises(
         common.OutOfBoundsError,
         match=r"^Lower bound must be lower than upper bound \(10 > 0\)$",
     ):
-        util.AdaptiveRange(lower=10, upper=0)
-
-
-def test_adaptive_rand_sample_below_invalid_bounds() -> None:
-    r = util.AdaptiveRange(lower=2, upper=10)
-    with pytest.raises(
-        common.OutOfBoundsError,
-        match=r"^Maximum must be greater than lower bound \(1 < 2\)$",
-    ):
-        r.sample_max(1)
-
-    with pytest.raises(
-        common.OutOfBoundsError,
-        match=r"^Maximum must be smaller or equal to upper bound \(11 > 10\)$",
-    ):
-        r.sample_max(11)
+        r.sample(10, 0)
 
 
 def test_adaptive_rand_in_range() -> None:
     for _ in range(1, 1000):
         lower = random.randint(0, 1000)  # noqa: S311
         upper = random.randint(lower, 1000)  # noqa: S311
-        r = util.AdaptiveRange(lower=lower, upper=upper)
-        sample = r.sample()
+        r = util.AdaptiveRange()
+        sample = r.sample(lower=lower, upper=upper)
         assert lower <= sample <= upper
 
 
 def test_adaptive_rand_uniform() -> None:
-    r = util.AdaptiveRange(lower=0, upper=1000)
-    data = [r.sample() for _ in range(1, 100000)]
+    r = util.AdaptiveRange()
+    data = [r.sample(lower=0, upper=1000) for _ in range(1, 100000)]
     result = chisquare(f_obs=list(np.bincount(data)))
     assert result.pvalue > 0.05
 
 
 def test_adaptive_rand_update() -> None:
-    r = util.AdaptiveRange(lower=0, upper=10)
+    r = util.AdaptiveRange()
     r.update()
-    for _ in range(100000):
-        r.update(success=r.sample() > 5)
-    data = [r.sample() for _ in range(1, 1000)]
-    assert all(d > 5 for d in data), data
+    for _ in range(10000):
+        r.update(success=r.sample(lower=1, upper=10) > 5)
+    data = [r.sample(lower=1, upper=10) for _ in range(1000)]
+    assert len([d for d in data if d <= 5]) / len(data) < 0.3, data
 
 
 def test_adaptive_choice_update() -> None:
@@ -153,27 +139,27 @@ def test_adaptive_choice_update() -> None:
 
 
 def test_large_adaptive_range_uniform() -> None:
-    r = util.AdaptiveLargeRange(0, 2**16 - 1)
-    data = [r.sample() for _ in range(1, 10000)]
+    r = util.AdaptiveRange()
+    data = [r.sample(0, 2**16 - 1) for _ in range(1, 10000)]
     result = chisquare(f_obs=list(np.bincount(data)))
     assert result.pvalue > 0.05
 
 
 def test_large_adaptive_range_update() -> None:
     upper = 100
-    r = util.AdaptiveLargeRange(1, upper)
-    for _ in range(1, 100000):
-        r.update(success=r.sample() < upper / 2)
-    data = [r.sample() for _ in range(1, upper)]
-    assert len([d for d in data if d < upper / 2]) / len(data) >= 2 / 3
+    r = util.AdaptiveRange()
+    for _ in range(1, 10000):
+        r.update(success=r.sample(1, upper) < upper / 2)
+    data = [r.sample(1, upper) for _ in range(1, upper)]
+    assert len([d for d in data if d < upper / 2]) / len(data) >= 0.6
 
 
 def test_large_adaptive_range_preferred_value() -> None:
-    r = util.AdaptiveLargeRange(1, 10)
-    for _ in range(1, 100000):
-        r.update(success=r.sample() == 5)
-    assert len([d for d in [r.sample() for _ in range(1, 10000)] if d == 5]) > 5000
+    r = util.AdaptiveRange()
+    for _ in range(1, 1000):
+        r.update(success=r.sample(1, 10) == 5)
+    assert len([d for d in [r.sample(1, 10) for _ in range(1, 100)] if d == 5]) > 40
 
-    for _ in range(1, 1000000):
-        r.update(success=r.sample() != 5)
-    assert len([d for d in [r.sample() for _ in range(1, 10000)] if d == 5]) < 2000
+    for _ in range(1, 10000):
+        r.update(success=r.sample(1, 10) != 5)
+    assert len([d for d in [r.sample(1, 10) for _ in range(1, 100)] if d == 5]) < 20

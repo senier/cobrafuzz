@@ -13,7 +13,7 @@ class DummyError(Exception):
 
 
 def non_crashing_target(data: bytes) -> None:
-    if data[0] == 42:
+    if len(data) > 0 and data[0] == 42:
         return  # pragma: no cover
 
 

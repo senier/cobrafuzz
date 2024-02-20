@@ -7,10 +7,19 @@ from cobrafuzz import common, mutator, util
 
 class StaticRand(util.AdaptiveRange):
     def __init__(self, value: int) -> None:
-        super().__init__(lower=value, upper=value)
+        super().__init__()
         self._value = value
 
-    def sample_max(self, _: int) -> int:
+    def sample(self, _lower: int, _upper: int) -> int:
+        return self._value
+
+
+class StaticIntChoice(util.AdaptiveChoiceBase[int]):
+    def __init__(self, value: int) -> None:
+        super().__init__(population=[value])
+        self._value = value
+
+    def sample(self) -> int:
         return self._value
 
 
@@ -461,7 +470,7 @@ def test_mutate_replace_a_byte_with_an_interesting_value_success(
     mutator._mutate_replace_a_byte_with_an_interesting_value(  # noqa: SLF001
         tmp,
         mutator.Rands(
-            interesting_8=StaticRand(value),
+            interesting_8=StaticIntChoice(value),
             pos=StaticRand(position),
         ),
     )
@@ -501,7 +510,7 @@ def test_mutate_replace_an_uint16_with_an_interesting_value_success(
     mutator._mutate_replace_an_uint16_with_an_interesting_value(  # noqa: SLF001
         tmp,
         mutator.Rands(
-            interesting_16=StaticRand(value),
+            interesting_16=StaticIntChoice(value),
             pos=StaticRand(position),
             big_endian=StaticRand(0 if little_endian else 1),
         ),
@@ -542,7 +551,7 @@ def test_mutate_replace_an_uint32_with_an_interesting_value_success(
     mutator._mutate_replace_an_uint32_with_an_interesting_value(  # noqa: SLF001
         tmp,
         mutator.Rands(
-            interesting_32=StaticRand(value),
+            interesting_32=StaticIntChoice(value),
             pos=StaticRand(position),
             big_endian=StaticRand(0 if little_endian else 1),
         ),
@@ -582,7 +591,7 @@ def test_mutate_replace_an_ascii_digit_with_another_digit_success(
         tmp,
         mutator.Rands(
             pos=StaticRand(position),
-            digits=StaticRand(ord("0") + value),
+            digits=StaticIntChoice(ord("0") + value),
         ),
     )
     assert tmp == expected

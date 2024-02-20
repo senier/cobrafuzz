@@ -26,16 +26,16 @@ def _mutate_remove_range_of_bytes(res: bytearray, rand: Rands) -> None:
         raise common.OutOfDataError
     assert isinstance(rand.length, util.AdaptiveRange)
     assert isinstance(rand.start, util.AdaptiveRange)
-    length = rand.length.sample_max(len(res))
-    util.remove(data=res, start=rand.start.sample_max(len(res) - length), length=length)
+    length = rand.length.sample(1, len(res))
+    util.remove(data=res, start=rand.start.sample(0, len(res) - length), length=length)
 
 
 def _mutate_insert_range_of_bytes(res: bytearray, rand: Rands) -> None:
     assert isinstance(rand.length, util.AdaptiveRange)
     assert isinstance(rand.start, util.AdaptiveRange)
     assert isinstance(rand.data, util.AdaptiveRange)
-    data = bytes(rand.data.sample() for _ in range(rand.length.sample()))
-    util.insert(data=res, start=rand.start.sample_max(len(res) + 1), data_to_insert=data)
+    data = bytes(rand.data.sample(0, 255) for _ in range(rand.length.sample(1, 10)))
+    util.insert(data=res, start=rand.start.sample(0, len(res)), data_to_insert=data)
 
 
 def _mutate_duplicate_range_of_bytes(res: bytearray, rand: Rands) -> None:
@@ -44,9 +44,9 @@ def _mutate_duplicate_range_of_bytes(res: bytearray, rand: Rands) -> None:
     assert isinstance(rand.src_pos, util.AdaptiveRange)
     assert isinstance(rand.dst_pos, util.AdaptiveRange)
     assert isinstance(rand.length, util.AdaptiveRange)
-    dst_pos = rand.dst_pos.sample_max(len(res))
-    src_pos = rand.src_pos.sample_max(dst_pos)
-    length = rand.length.sample_max(len(res) - src_pos)
+    dst_pos = rand.dst_pos.sample(1, len(res) - 1)
+    src_pos = rand.src_pos.sample(0, dst_pos)
+    length = rand.length.sample(1, len(res) - src_pos)
     util.insert(res, dst_pos, res[src_pos : src_pos + length])
 
 
@@ -56,9 +56,9 @@ def _mutate_copy_range_of_bytes(res: bytearray, rand: Rands) -> None:
     assert isinstance(rand.src_pos, util.AdaptiveRange)
     assert isinstance(rand.dst_pos, util.AdaptiveRange)
     assert isinstance(rand.length, util.AdaptiveRange)
-    dst_pos = rand.dst_pos.sample_max(len(res))
-    src_pos = rand.src_pos.sample_max(dst_pos)
-    length = rand.length.sample_max(min(len(res) - src_pos, len(res) - dst_pos))
+    dst_pos = rand.dst_pos.sample(1, len(res) - 1)
+    src_pos = rand.src_pos.sample(0, dst_pos)
+    length = rand.length.sample(1, min(len(res) - src_pos, len(res) - dst_pos))
     util.copy(res, src_pos, dst_pos, length)
 
 
@@ -67,8 +67,8 @@ def _mutate_bit_flip(res: bytearray, rand: Rands) -> None:
         raise common.OutOfDataError
     assert isinstance(rand.byte_pos, util.AdaptiveRange)
     assert isinstance(rand.bit_pos, util.AdaptiveRange)
-    byte_pos = rand.byte_pos.sample_max(len(res))
-    bit_pos = rand.bit_pos.sample()
+    byte_pos = rand.byte_pos.sample(0, len(res) - 1)
+    bit_pos = rand.bit_pos.sample(0, 7)
     res[byte_pos] ^= 1 << bit_pos
 
 
@@ -77,8 +77,8 @@ def _mutate_flip_random_bits_of_random_byte(res: bytearray, rand: Rands) -> None
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     assert isinstance(rand.value, util.AdaptiveRange)
-    pos = rand.pos.sample_max(len(res))
-    res[pos] ^= rand.value.sample()
+    pos = rand.pos.sample(0, len(res) - 1)
+    res[pos] ^= rand.value.sample(0, 255)
 
 
 def _mutate_swap_two_bytes(res: bytearray, rand: Rands) -> None:
@@ -86,8 +86,8 @@ def _mutate_swap_two_bytes(res: bytearray, rand: Rands) -> None:
         raise common.OutOfDataError
     assert isinstance(rand.first_pos, util.AdaptiveRange)
     assert isinstance(rand.second_pos, util.AdaptiveRange)
-    first_pos = rand.first_pos.sample_max(len(res))
-    second_pos = rand.second_pos.sample_max(len(res))
+    first_pos = rand.first_pos.sample(0, len(res) - 1)
+    second_pos = rand.second_pos.sample(0, len(res) - 1)
     res[first_pos], res[second_pos] = res[second_pos], res[first_pos]
 
 
@@ -96,8 +96,8 @@ def _mutate_add_subtract_from_a_byte(res: bytearray, rand: Rands) -> None:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
     assert isinstance(rand.value, util.AdaptiveRange)
-    pos = rand.pos.sample_max(len(res))
-    v_int = rand.value.sample()
+    pos = rand.pos.sample(0, len(res) - 1)
+    v_int = rand.value.sample(0, 255)
     res[pos] = (res[pos] + v_int) % 256
 
 
@@ -105,9 +105,11 @@ def _mutate_add_subtract_from_a_uint16(res: bytearray, rand: Rands) -> None:
     if len(res) < 2:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
-    pos = rand.pos.sample_max(len(res) - 1)
-    v_int = rand.value.sample()
-    v = struct.pack(">H", v_int) if rand.big_endian.sample() else struct.pack("<H", v_int)
+    assert isinstance(rand.value, util.AdaptiveRange)
+    assert isinstance(rand.big_endian, util.AdaptiveRange)
+    pos = rand.pos.sample(0, len(res) - 2)
+    v_int = rand.value.sample(0, 2**16 - 1)
+    v = struct.pack(">H", v_int) if rand.big_endian.sample(0, 1) else struct.pack("<H", v_int)
     # TODO(#18): Implement version performing 16-bit addition
     res[pos] = (res[pos] + v[0]) % 256
     res[pos + 1] = (res[pos + 1] + v[1]) % 256
@@ -117,9 +119,11 @@ def _mutate_add_subtract_from_a_uint32(res: bytearray, rand: Rands) -> None:
     if len(res) < 4:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
-    pos = rand.pos.sample_max(len(res) - 3)
-    v_int = rand.value.sample()
-    v = struct.pack(">I", v_int) if rand.big_endian.sample() else struct.pack("<I", v_int)
+    assert isinstance(rand.value, util.AdaptiveRange)
+    assert isinstance(rand.big_endian, util.AdaptiveRange)
+    pos = rand.pos.sample(0, len(res) - 4)
+    v_int = rand.value.sample(0, 2**32 - 1)
+    v = struct.pack(">I", v_int) if rand.big_endian.sample(0, 1) else struct.pack("<I", v_int)
     res[pos] = (res[pos] + v[0]) % 256
     res[pos + 1] = (res[pos + 1] + v[1]) % 256
     res[pos + 2] = (res[pos + 2] + v[2]) % 256
@@ -130,9 +134,11 @@ def _mutate_add_subtract_from_a_uint64(res: bytearray, rand: Rands) -> None:
     if len(res) < 8:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
-    pos = rand.pos.sample_max(len(res) - 7)
-    v_int = rand.value.sample()
-    v = struct.pack(">Q", v_int) if rand.big_endian.sample() else struct.pack("<Q", v_int)
+    assert isinstance(rand.value, util.AdaptiveRange)
+    assert isinstance(rand.big_endian, util.AdaptiveRange)
+    pos = rand.pos.sample(0, len(res) - 8)
+    v_int = rand.value.sample(0, 2**64 - 1)
+    v = struct.pack(">Q", v_int) if rand.big_endian.sample(0, 1) else struct.pack("<Q", v_int)
     res[pos] = (res[pos] + v[0]) % 256
     res[pos + 1] = (res[pos + 1] + v[1]) % 256
     res[pos + 2] = (res[pos + 2] + v[2]) % 256
@@ -147,7 +153,8 @@ def _mutate_replace_a_byte_with_an_interesting_value(res: bytearray, rand: Rands
     if len(res) < 1:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
-    pos = rand.pos.sample_max(len(res))
+    assert isinstance(rand.interesting_8, util.AdaptiveChoiceBase)
+    pos = rand.pos.sample(0, len(res) - 1)
     res[pos] = rand.interesting_8.sample()
 
 
@@ -155,9 +162,11 @@ def _mutate_replace_an_uint16_with_an_interesting_value(res: bytearray, rand: Ra
     if len(res) < 2:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
-    pos = rand.pos.sample_max(len(res) - 1)
+    assert isinstance(rand.big_endian, util.AdaptiveRange)
+    assert isinstance(rand.interesting_16, util.AdaptiveChoiceBase)
+    pos = rand.pos.sample(0, len(res) - 2)
     v_int = rand.interesting_16.sample()
-    v = struct.pack(">H", v_int) if rand.big_endian.sample() else struct.pack("<H", v_int)
+    v = struct.pack(">H", v_int) if rand.big_endian.sample(0, 1) else struct.pack("<H", v_int)
     res[pos] = v[0] % 256
     res[pos + 1] = v[1] % 256
 
@@ -166,9 +175,11 @@ def _mutate_replace_an_uint32_with_an_interesting_value(res: bytearray, rand: Ra
     if len(res) < 4:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
-    pos = rand.pos.sample_max(len(res) - 3)
+    assert isinstance(rand.big_endian, util.AdaptiveRange)
+    assert isinstance(rand.interesting_32, util.AdaptiveChoiceBase)
+    pos = rand.pos.sample(0, len(res) - 4)
     v_int = rand.interesting_32.sample()
-    v = struct.pack(">I", v_int) if rand.big_endian.sample() else struct.pack("<I", v_int)
+    v = struct.pack(">I", v_int) if rand.big_endian.sample(0, 1) else struct.pack("<I", v_int)
     res[pos] = v[0] % 256
     res[pos + 1] = v[1] % 256
     res[pos + 2] = v[2] % 256
@@ -180,7 +191,8 @@ def _mutate_replace_an_ascii_digit_with_another_digit(res: bytearray, rand: Rand
     if len(digits_present) < 1:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
-    pos = rand.pos.sample_max(len(res))
+    assert isinstance(rand.digits, util.AdaptiveChoiceBase)
+    pos = rand.pos.sample(0, len(res) - 1)
     res[pos] = rand.digits.sample()
 
 
@@ -188,7 +200,8 @@ class Mutator:
     def __init__(self, max_input_size: int = 1024, max_modifications: int = 10):
         self._inputs: util.AdaptiveChoiceBase[bytearray] = util.AdaptiveChoiceBase(population=None)
         self._max_input_size = max_input_size
-        self._modifications = util.AdaptiveRange(1, max_modifications)
+        self._max_modifications = max_modifications
+        self._modifications = util.AdaptiveRange()
         self._mutators: util.AdaptiveChoiceBase[
             tuple[Callable[[bytearray, Rands], None], Rands]
         ] = util.AdaptiveChoiceBase(
@@ -196,91 +209,91 @@ class Mutator:
                 (
                     _mutate_remove_range_of_bytes,
                     Rands(
-                        length=util.AdaptiveRange(1, max_input_size),
-                        start=util.AdaptiveRange(0, max_input_size),
+                        length=util.AdaptiveRange(),
+                        start=util.AdaptiveRange(),
                     ),
                 ),
                 (
                     _mutate_insert_range_of_bytes,
                     Rands(
-                        length=util.AdaptiveRange(1, 10),
-                        start=util.AdaptiveRange(0, max_input_size),
-                        data=util.AdaptiveRange(0, 255),
+                        length=util.AdaptiveRange(),
+                        start=util.AdaptiveRange(),
+                        data=util.AdaptiveRange(),
                     ),
                 ),
                 (
                     _mutate_duplicate_range_of_bytes,
                     Rands(
-                        src_pos=util.AdaptiveRange(0, max_input_size),
-                        dst_pos=util.AdaptiveRange(1, max_input_size),
-                        length=util.AdaptiveRange(1, max_input_size),
+                        src_pos=util.AdaptiveRange(),
+                        dst_pos=util.AdaptiveRange(),
+                        length=util.AdaptiveRange(),
                     ),
                 ),
                 (
                     _mutate_copy_range_of_bytes,
                     Rands(
-                        src_pos=util.AdaptiveRange(0, max_input_size),
-                        dst_pos=util.AdaptiveRange(1, max_input_size),
-                        length=util.AdaptiveRange(1, max_input_size),
+                        src_pos=util.AdaptiveRange(),
+                        dst_pos=util.AdaptiveRange(),
+                        length=util.AdaptiveRange(),
                     ),
                 ),
                 (
                     _mutate_bit_flip,
                     Rands(
-                        byte_pos=util.AdaptiveRange(0, max_input_size),
-                        bit_pos=util.AdaptiveRange(0, 7),
+                        byte_pos=util.AdaptiveRange(),
+                        bit_pos=util.AdaptiveRange(),
                     ),
                 ),
                 (
                     _mutate_flip_random_bits_of_random_byte,
                     Rands(
-                        pos=util.AdaptiveRange(0, max_input_size),
-                        value=util.AdaptiveRange(0, 255),
+                        pos=util.AdaptiveRange(),
+                        value=util.AdaptiveRange(),
                     ),
                 ),
                 (
                     _mutate_swap_two_bytes,
                     Rands(
-                        first_pos=util.AdaptiveRange(0, max_input_size),
-                        second_pos=util.AdaptiveRange(0, max_input_size),
+                        first_pos=util.AdaptiveRange(),
+                        second_pos=util.AdaptiveRange(),
                     ),
                 ),
                 (
                     _mutate_add_subtract_from_a_byte,
                     Rands(
-                        pos=util.AdaptiveRange(0, max_input_size),
-                        value=util.AdaptiveRange(0, 255),
+                        pos=util.AdaptiveRange(),
+                        value=util.AdaptiveRange(),
                     ),
                 ),
                 (
                     _mutate_add_subtract_from_a_uint16,
                     Rands(
-                        pos=util.AdaptiveRange(0, max_input_size),
-                        value=util.AdaptiveLargeRange(0, 2**16 - 1),
-                        big_endian=util.AdaptiveRange(0, 1),
+                        pos=util.AdaptiveRange(),
+                        value=util.AdaptiveRange(),
+                        big_endian=util.AdaptiveRange(),
                     ),
                 ),
                 (
                     _mutate_add_subtract_from_a_uint32,
                     Rands(
-                        pos=util.AdaptiveRange(0, max_input_size),
-                        value=util.AdaptiveLargeRange(0, 2**32 - 1),
-                        big_endian=util.AdaptiveRange(0, 1),
+                        pos=util.AdaptiveRange(),
+                        value=util.AdaptiveRange(),
+                        big_endian=util.AdaptiveRange(),
                     ),
                 ),
                 (
                     _mutate_add_subtract_from_a_uint64,
                     Rands(
-                        pos=util.AdaptiveRange(0, max_input_size),
-                        value=util.AdaptiveLargeRange(0, 2**64 - 1),
-                        big_endian=util.AdaptiveRange(0, 1),
+                        pos=util.AdaptiveRange(),
+                        value=util.AdaptiveRange(),
+                        big_endian=util.AdaptiveRange(),
                     ),
                 ),
                 (
                     _mutate_replace_a_byte_with_an_interesting_value,
                     Rands(
-                        pos=util.AdaptiveRange(0, max_input_size),
-                        interesting_8=util.AdaptiveIntChoice(
+                        pos=util.AdaptiveRange(),
+                        interesting_8=util.AdaptiveChoiceBase(
                             population=[1, 1, 16, 32, 64, 100, 127, 128, 129, 255],
                         ),
                     ),
@@ -288,18 +301,18 @@ class Mutator:
                 (
                     _mutate_replace_an_uint16_with_an_interesting_value,
                     Rands(
-                        pos=util.AdaptiveRange(0, max_input_size),
-                        interesting_16=util.AdaptiveIntChoice(
+                        pos=util.AdaptiveRange(),
+                        interesting_16=util.AdaptiveChoiceBase(
                             population=[0, 128, 255, 256, 512, 1000, 1024, 4096, 32767, 65535],
                         ),
-                        big_endian=util.AdaptiveRange(0, 1),
+                        big_endian=util.AdaptiveRange(),
                     ),
                 ),
                 (
                     _mutate_replace_an_uint32_with_an_interesting_value,
                     Rands(
-                        pos=util.AdaptiveRange(0, max_input_size),
-                        interesting_32=util.AdaptiveIntChoice(
+                        pos=util.AdaptiveRange(),
+                        interesting_32=util.AdaptiveChoiceBase(
                             population=[
                                 0,
                                 1,
@@ -311,14 +324,14 @@ class Mutator:
                                 4294967295,
                             ],
                         ),
-                        big_endian=util.AdaptiveRange(0, 1),
+                        big_endian=util.AdaptiveRange(),
                     ),
                 ),
                 (
                     _mutate_replace_an_ascii_digit_with_another_digit,
                     Rands(
-                        pos=util.AdaptiveRange(0, max_input_size),
-                        digits=util.AdaptiveIntChoice(
+                        pos=util.AdaptiveRange(),
+                        digits=util.AdaptiveChoiceBase(
                             population=[
                                 ord(i) for i in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
                             ],
@@ -331,7 +344,7 @@ class Mutator:
 
     def _mutate(self, buf: bytearray) -> bytearray:
         res = buf[:]
-        nm = self._modifications.sample()
+        nm = self._modifications.sample(1, self._max_modifications)
         while nm:
             modify, self._last_rands = self._mutators.sample()
             try:
