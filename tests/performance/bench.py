@@ -16,7 +16,13 @@ def _mutate(rounds: int) -> None:
     logging.info("mutate: %d/s", rounds // duration)
 
 
+def bench_mutate(args: argparse.Namespace) -> None:
+    _mutate(args.rounds)
+
+
 def main() -> None:
+    logging.basicConfig(level=logging.INFO)
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--rounds",
@@ -24,17 +30,13 @@ def main() -> None:
         default=1000000,
         help="Rounds to execute benchmark for (default: %(default)d)",
     )
-    parser.add_argument(
-        "--mutate",
-        action="store_true",
-        help="Benchmark corpus.mutate",
-    )
+
+    subparsers = parser.add_subparsers()
+    mutate_parser = subparsers.add_parser("mutate", help="Benchmark corpus.mutate")
+    mutate_parser.set_defaults(func=bench_mutate)
+
     args = parser.parse_args()
-
-    logging.basicConfig(level=logging.INFO)
-
-    if args.mutate:
-        _mutate(args.rounds)
+    args.func(args)
 
 
 if __name__ == "__main__":
