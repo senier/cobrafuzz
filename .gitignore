@@ -4,7 +4,7 @@ __pycache__
 crash-*
 dist/
 build/
-/.venv
+/.venv*
 /.devel_installed
 /cobrafuzz.egg-info
 /.coverage
