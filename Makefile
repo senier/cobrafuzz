@@ -1,4 +1,6 @@
 PYTHON_PACKAGES = cobrafuzz/*.py tests/**/*.py examples/**/*.py
+PYTHON ?= python3
+PYTEST = $(PYTHON) -m pytest
 
 all: check test
 
@@ -22,13 +24,13 @@ check_dead_code: .devel_installed
 test: test_unit test_integration test_build
 
 test_unit: .devel_installed
-	PYTHONPATH=. timeout -k 30 60 pytest -vv --cov-report term:skip-covered --cov-report xml:coverage.xml --cov=cobrafuzz --cov=tests.unit --cov-branch --cov-fail-under=100 tests/unit
+	PYTHONPATH=. timeout -k 30 60 $(PYTEST) -vv --cov-report term:skip-covered --cov-report xml:coverage.xml --cov=cobrafuzz --cov=tests.unit --cov-branch --cov-fail-under=100 tests/unit
 
 test_integration: .devel_installed
-	PYTHONPATH=. timeout -k 30 60 pytest -vv tests/integration
+	PYTHONPATH=. timeout -k 30 60 $(PYTEST) -vv tests/integration
 
 test_build: .devel_installed
-	python3 -m build
+	$(PYTHON) -m build
 
 install_devel: .devel_installed
 
@@ -42,10 +44,10 @@ format:
 	black $(PYTHON_PACKAGES)
 
 fuzz-%:
-	python examples/fuzz_$*/fuzz.py --crash-dir examples/fuzz_$*/crashes --state examples/fuzz_$*/state.json --close-stdout --close-stderr examples/fuzz_$*/seeds
+	@$(PYTHON) examples/fuzz_$*/fuzz.py --crash-dir examples/fuzz_$*/crashes --state examples/fuzz_$*/state.json --close-stdout --close-stderr examples/fuzz_$*/seeds
 
 regr-%:
-	@python examples/fuzz_$*/fuzz.py --crash-dir examples/fuzz_$*/crashes --regression
+	@$(PYTHON) examples/fuzz_$*/fuzz.py --crash-dir examples/fuzz_$*/crashes --regression
 
 clean-%:
 	@rm -f examples/fuzz_$*/state.json
