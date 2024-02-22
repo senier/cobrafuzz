@@ -57,6 +57,8 @@ class AdaptiveRange(AdaptiveRandBase[int]):
             raise common.OutOfBoundsError(
                 f"Lower bound must be lower than upper bound ({lower} > {upper})",
             )
+        if upper == lower:
+            return upper
         self._last_value = random.choices(self._population, self._distribution)[0]  # noqa: S311
         if self._last_value is None or self._last_value < lower or self._last_value > upper:
             self._last_value = random.randint(lower, upper)  # noqa: S311
