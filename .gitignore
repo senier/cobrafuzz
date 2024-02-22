@@ -12,3 +12,4 @@ build/
 /coverage.xml
 crashes
 state.json
+/benchmarks
