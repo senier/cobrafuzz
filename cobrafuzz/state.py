@@ -13,10 +13,13 @@ class LoadError(Exception):
 
 
 class State:
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         seeds: Optional[list[Path]] = None,
         max_input_size: int = 4096,
+        max_modifications: int = 10,
+        max_insert_length: int = 10,
+        adaptive: bool = True,
         file: Optional[Path] = None,
     ):
         seeds = seeds or []
@@ -25,7 +28,12 @@ class State:
         self._max_input_size = max_input_size
         self._covered: set[tuple[Optional[str], Optional[int], str, int]] = set()
         self._file = file
-        self._mutator = mutator.Mutator(max_input_size=max_input_size)
+        self._mutator = mutator.Mutator(
+            max_input_size=max_input_size,
+            max_modifications=max_modifications,
+            max_insert_length=max_insert_length,
+            adaptive=adaptive,
+        )
 
         for path in [p for p in seeds if p.is_file()] + [
             f for p in seeds if p.is_dir() for f in p.glob("*") if f.is_file()

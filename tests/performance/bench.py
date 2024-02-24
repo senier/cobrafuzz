@@ -69,7 +69,12 @@ def bench_paths(args: argparse.Namespace) -> None:
     tracer.initialize()
     for example in EXAMPLES:
         result[example] = {}
-        st = state.State()
+        st = state.State(
+            max_input_size=args.max_input_size,
+            max_insert_length=args.max_insert_length,
+            max_modifications=args.max_modifications,
+            adaptive=not (args.non_adaptive or False),
+        )
         tracer.reset()
         target = importlib.import_module(f"examples.fuzz_{example}.fuzz")
         for run in range(1, args.rounds):
@@ -91,7 +96,12 @@ def bench_paths(args: argparse.Namespace) -> None:
 
 
 def bench_mutate(args: argparse.Namespace) -> None:
-    m = mutator.Mutator()
+    m = mutator.Mutator(
+        max_input_size=args.max_input_size,
+        max_insert_length=args.max_input_length,
+        max_modifications=args.max_modifications,
+        adaptive=not (args.non_adaptive or False),
+    )
     data = bytearray(b"start")
     start = time.time()
     for _ in range(args.rounds):
@@ -113,6 +123,30 @@ def main() -> None:
 
     subparsers = parser.add_subparsers()
     mutate_parser = subparsers.add_parser("mutate", help="Benchmark corpus.mutate")
+    mutate_parser.add_argument(
+        "--max-modifications",
+        type=int,
+        default=10,
+        help="Maximum modifications per sample",
+    )
+    mutate_parser.add_argument(
+        "--max-insert-length",
+        type=int,
+        default=10,
+        help="Maximum number of bytes to insert",
+    )
+    mutate_parser.add_argument(
+        "--max-input-size",
+        type=int,
+        default=4096,
+        help="Maximum sample length",
+    )
+    mutate_parser.add_argument(
+        "--non-adaptive",
+        type=bool,
+        default=False,
+        help="Do not adapt distribution",
+    )
     mutate_parser.set_defaults(func=bench_mutate)
 
     paths_parser = subparsers.add_parser("paths", help="Benchmark path exploration")
@@ -122,6 +156,29 @@ def main() -> None:
         type=str,
         required=True,
         help="Label to associate benchmark with",
+    )
+    paths_parser.add_argument(
+        "--max-modifications",
+        type=int,
+        default=10,
+        help="Maximum modifications per sample",
+    )
+    paths_parser.add_argument(
+        "--max-insert-length",
+        type=int,
+        default=10,
+        help="Maximum number of bytes to insert",
+    )
+    paths_parser.add_argument(
+        "--max-input-size",
+        type=int,
+        default=4096,
+        help="Maximum sample length",
+    )
+    paths_parser.add_argument(
+        "--non-adaptive",
+        action="store_true",
+        help="Do not adapt distribution",
     )
     paths_parser.set_defaults(func=bench_paths)
 

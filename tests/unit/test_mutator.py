@@ -24,7 +24,7 @@ class StaticIntChoice(util.AdaptiveChoiceBase[int]):
 
 
 def test_mutate(monkeypatch: pytest.MonkeyPatch) -> None:
-    def modify(data: bytearray, _: mutator.Rands) -> None:
+    def modify(data: bytearray, _: mutator.Params) -> None:
         data.insert(0, ord("a"))
         data.append(ord("b"))
 
@@ -39,7 +39,7 @@ def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
     m = mutator.Mutator()
     m.update()
 
-    def modify(data: bytearray, _: mutator.Rands) -> None:
+    def modify(data: bytearray, _: mutator.Params) -> None:
         if data[0] != 0:
             data[0] = 0
 
@@ -58,7 +58,7 @@ def test_mutate_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_mutate_remove_range_of_bytes_fail() -> None:
     res = bytearray()
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_remove_range_of_bytes(res, mutator.Rands())  # noqa: SLF001
+        mutator._mutate_remove_range_of_bytes(res, mutator.Params())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -79,7 +79,7 @@ def test_mutate_remove_range_of_bytes_success(
 
     mutator._mutate_remove_range_of_bytes(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             start=StaticRand(start),
             length=StaticRand(length),
         ),
@@ -105,10 +105,11 @@ def test_mutate_insert_range_of_bytes_success(
 
     mutator._mutate_insert_range_of_bytes(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             start=StaticRand(start),
             length=StaticRand(length),
             data=StaticRand(ord("X")),
+            max_length=util.Param(2),
         ),
     )
     assert tmp == expected
@@ -118,7 +119,7 @@ def test_mutate_duplicate_range_of_bytes_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_duplicate_range_of_bytes(data, mutator.Rands())  # noqa: SLF001
+        mutator._mutate_duplicate_range_of_bytes(data, mutator.Params())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -143,7 +144,7 @@ def test_mutate_duplicate_range_of_bytes_success(
 
     mutator._mutate_duplicate_range_of_bytes(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             src_pos=StaticRand(start),
             dst_pos=StaticRand(dest),
             length=StaticRand(length),
@@ -156,7 +157,7 @@ def test_mutate_copy_range_of_bytes_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_copy_range_of_bytes(data, mutator.Rands())  # noqa: SLF001
+        mutator._mutate_copy_range_of_bytes(data, mutator.Params())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -180,7 +181,7 @@ def test_mutate_copy_range_of_bytes_success(
 
     mutator._mutate_copy_range_of_bytes(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             src_pos=StaticRand(start),
             dst_pos=StaticRand(dest),
             length=StaticRand(length),
@@ -193,7 +194,7 @@ def test_mutate_bit_flip_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_bit_flip(data, mutator.Rands())  # noqa: SLF001
+        mutator._mutate_bit_flip(data, mutator.Params())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -215,7 +216,7 @@ def test_mutate_bit_flip_success(
 
     mutator._mutate_bit_flip(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             bit_pos=StaticRand(bit),
             byte_pos=StaticRand(byte),
         ),
@@ -227,7 +228,7 @@ def test_mutate_flip_random_bits_of_random_byte_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_flip_random_bits_of_random_byte(data, mutator.Rands())  # noqa: SLF001
+        mutator._mutate_flip_random_bits_of_random_byte(data, mutator.Params())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -248,7 +249,7 @@ def test_mutate_flip_random_bits_of_random_byte_success(
 
     mutator._mutate_flip_random_bits_of_random_byte(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             pos=StaticRand(byte),
             value=StaticRand(value),
         ),
@@ -260,7 +261,7 @@ def test_mutate_swap_two_bytes_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_swap_two_bytes(data, mutator.Rands())  # noqa: SLF001
+        mutator._mutate_swap_two_bytes(data, mutator.Params())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -285,7 +286,7 @@ def test_mutate_swap_two_bytes(
 
     mutator._mutate_swap_two_bytes(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             first_pos=StaticRand(source),
             second_pos=StaticRand(dest),
         ),
@@ -297,7 +298,7 @@ def test_mutate_add_subtract_from_a_byte_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_add_subtract_from_a_byte(data, mutator.Rands())  # noqa: SLF001
+        mutator._mutate_add_subtract_from_a_byte(data, mutator.Params())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -322,7 +323,7 @@ def test_mutate_add_subtract_from_a_byte_success(
 
     mutator._mutate_add_subtract_from_a_byte(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             value=StaticRand(value),
             pos=StaticRand(position),
         ),
@@ -334,7 +335,7 @@ def test_mutate_add_subtract_from_a_uint16_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_add_subtract_from_a_uint16(data, mutator.Rands())  # noqa: SLF001
+        mutator._mutate_add_subtract_from_a_uint16(data, mutator.Params())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -357,7 +358,7 @@ def test_mutate_add_subtract_from_a_uint16_success(
 
     mutator._mutate_add_subtract_from_a_uint16(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             value=StaticRand(value),
             pos=StaticRand(position),
             big_endian=StaticRand(0 if little_endian else 1),
@@ -370,7 +371,7 @@ def test_mutate_add_subtract_from_a_uint32_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_add_subtract_from_a_uint32(data, mutator.Rands())  # noqa: SLF001
+        mutator._mutate_add_subtract_from_a_uint32(data, mutator.Params())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -393,7 +394,7 @@ def test_mutate_add_subtract_from_a_uint32_success(
 
     mutator._mutate_add_subtract_from_a_uint32(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             value=StaticRand(value),
             pos=StaticRand(position),
             big_endian=StaticRand(0 if little_endian else 1),
@@ -406,7 +407,7 @@ def test_mutate_add_subtract_from_a_uint64_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_add_subtract_from_a_uint64(data, mutator.Rands())  # noqa: SLF001
+        mutator._mutate_add_subtract_from_a_uint64(data, mutator.Params())  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -429,7 +430,7 @@ def test_mutate_add_subtract_from_a_uint64_success(
 
     mutator._mutate_add_subtract_from_a_uint64(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             value=StaticRand(value),
             pos=StaticRand(position),
             big_endian=StaticRand(0 if little_endian else 1),
@@ -444,7 +445,7 @@ def test_mutate_replace_a_byte_with_an_interesting_value_fail() -> None:
     with pytest.raises(common.OutOfDataError):
         mutator._mutate_replace_a_byte_with_an_interesting_value(  # noqa: SLF001
             data,
-            mutator.Rands(),
+            mutator.Params(),
         )
 
 
@@ -469,7 +470,7 @@ def test_mutate_replace_a_byte_with_an_interesting_value_success(
 
     mutator._mutate_replace_a_byte_with_an_interesting_value(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             interesting_8=StaticIntChoice(value),
             pos=StaticRand(position),
         ),
@@ -483,7 +484,7 @@ def test_mutate_replace_an_uint16_with_an_interesting_value_fail() -> None:
     with pytest.raises(common.OutOfDataError):
         mutator._mutate_replace_an_uint16_with_an_interesting_value(  # noqa: SLF001
             data,
-            mutator.Rands(),
+            mutator.Params(),
         )
 
 
@@ -509,7 +510,7 @@ def test_mutate_replace_an_uint16_with_an_interesting_value_success(
 
     mutator._mutate_replace_an_uint16_with_an_interesting_value(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             interesting_16=StaticIntChoice(value),
             pos=StaticRand(position),
             big_endian=StaticRand(0 if little_endian else 1),
@@ -524,7 +525,7 @@ def test_mutate_replace_an_uint32_with_an_interesting_value_fail() -> None:
     with pytest.raises(common.OutOfDataError):
         mutator._mutate_replace_an_uint32_with_an_interesting_value(  # noqa: SLF001
             data,
-            mutator.Rands(),
+            mutator.Params(),
         )
 
 
@@ -550,7 +551,7 @@ def test_mutate_replace_an_uint32_with_an_interesting_value_success(
 
     mutator._mutate_replace_an_uint32_with_an_interesting_value(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             interesting_32=StaticIntChoice(value),
             pos=StaticRand(position),
             big_endian=StaticRand(0 if little_endian else 1),
@@ -565,7 +566,7 @@ def test_mutate_replace_an_ascii_digit_with_another_digit_fail() -> None:
     with pytest.raises(common.OutOfDataError):
         mutator._mutate_replace_an_ascii_digit_with_another_digit(  # noqa: SLF001
             data,
-            mutator.Rands(),
+            mutator.Params(),
         )
 
 
@@ -589,7 +590,7 @@ def test_mutate_replace_an_ascii_digit_with_another_digit_success(
 
     mutator._mutate_replace_an_ascii_digit_with_another_digit(  # noqa: SLF001
         tmp,
-        mutator.Rands(
+        mutator.Params(
             pos=StaticRand(position),
             digits=StaticIntChoice(ord("0") + value),
         ),

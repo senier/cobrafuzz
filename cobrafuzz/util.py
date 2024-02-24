@@ -8,7 +8,23 @@ from . import common
 PopulationType = TypeVar("PopulationType")
 
 
-class AdaptiveRandBase(Generic[PopulationType]):
+class ParamBase(Generic[PopulationType]):
+    def update(self, success: bool = False) -> None:
+        raise NotImplementedError
+
+
+class Param(ParamBase[int]):
+    def __init__(self, value: int) -> None:
+        self._value = value
+
+    def __call__(self) -> int:
+        return self._value
+
+    def update(self, success: bool = False) -> None:
+        pass
+
+
+class AdaptiveRandBase(ParamBase[PopulationType]):
     def _succeed(self) -> None:
         raise NotImplementedError
 
@@ -23,13 +39,16 @@ class AdaptiveRandBase(Generic[PopulationType]):
 
 
 class AdaptiveRange(AdaptiveRandBase[int]):
-    def __init__(self) -> None:
+    def __init__(self, adaptive: bool = True) -> None:
+        self._adaptive = adaptive
         self._population: list[Optional[int]] = [None]
         self._distribution: list[int] = [1]
         self._last_value: Optional[int] = None
         self._last_index: int = 0
 
     def _succeed(self) -> None:
+        if not self._adaptive:
+            return
         if self._last_index:
             self._distribution[self._last_index] += 1
         else:
@@ -40,7 +59,7 @@ class AdaptiveRange(AdaptiveRandBase[int]):
         self._last_index = 0
 
     def _fail(self) -> None:
-        if not self._last_index:
+        if not self._adaptive or not self._last_index:
             return
 
         if self._distribution[self._last_index] <= 1:
@@ -59,6 +78,8 @@ class AdaptiveRange(AdaptiveRandBase[int]):
             )
         if upper == lower:
             return upper
+        if not self._adaptive:
+            return random.randint(lower, upper)  # noqa: S311
         self._last_value = random.choices(self._population, self._distribution)[0]  # noqa: S311
         if self._last_value is None or self._last_value < lower or self._last_value > upper:
             self._last_value = random.randint(lower, upper)  # noqa: S311
@@ -68,8 +89,9 @@ class AdaptiveRange(AdaptiveRandBase[int]):
 
 
 class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
-    def __init__(self, population: Optional[list[PopulationType]]) -> None:
+    def __init__(self, population: Optional[list[PopulationType]], adaptive: bool = True) -> None:
         self._population = population or []
+        self._adaptive = adaptive
         self._distribution = [1 for _ in self._population]
         self._last: Optional[PopulationType] = None
 
@@ -80,21 +102,24 @@ class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
         yield from self._population
 
     def _succeed(self) -> None:
-        if self._last is None:
+        if not self._adaptive or self._last is None:
             return
         self._distribution[self._population.index(self._last)] += 1
 
     def _fail(self) -> None:
-        if self._last is None:
+        if not self._adaptive or self._last is None:
             return
         if self._distribution[self._population.index(self._last)] > 1:
             self._distribution[self._population.index(self._last)] -= 1
 
     def append(self, element: PopulationType) -> None:
         self._population.append(element)
-        self._distribution.append(1)
+        if self._adaptive:
+            self._distribution.append(1)
 
     def sample(self) -> PopulationType:
+        if not self._adaptive:
+            return random.choice(self._population)  # noqa: S311
         self._last = random.choices(self._population, self._distribution, k=1)[0]  # noqa: S311
         return self._last
 
