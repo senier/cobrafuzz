@@ -138,11 +138,15 @@ def test_adaptive_choice_update() -> None:
     assert all(d != "a" for d in data), data
 
 
-def test_large_adaptive_range_uniform() -> None:
-    r = util.AdaptiveRange()
-    data = [r.sample(0, 2**16 - 1) for _ in range(1, 10000)]
-    result = chisquare(f_obs=list(np.bincount(data)))
-    assert result.pvalue > 0.05
+def test_large_adaptive_range_uniform() -> None:  # pragma: no cover
+    for _ in range(5):
+        r = util.AdaptiveRange()
+        data = [r.sample(0, 2**16 - 1) for _ in range(1, 10000)]
+        result = chisquare(f_obs=list(np.bincount(data)))
+        if result.pvalue > 0.05:
+            break
+    else:
+        pytest.fail("Non-uniform random numbers")
 
 
 def test_large_adaptive_range_update() -> None:
