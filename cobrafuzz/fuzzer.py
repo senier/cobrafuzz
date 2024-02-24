@@ -175,11 +175,14 @@ class Fuzzer:
         self,
         crash_dir: Path,
         target: Callable[[bytes], None],
+        adaptive: bool = True,
         close_stderr: Optional[bool] = None,
         close_stdout: Optional[bool] = None,
         stat_frequency: int = 5,
         max_crashes: Optional[int] = None,
         max_input_size: int = 4096,
+        max_insert_length: int = 10,
+        max_modifications: int = 10,
         max_runs: Optional[int] = None,
         max_time: Optional[int] = None,
         num_workers: Optional[int] = 1,
@@ -194,26 +197,31 @@ class Fuzzer:
 
         Arguments:
         ---------
-        crash_dir:      Directory to store crash artifacts in. Will be created if missing.
-        target:         Python function to fuzz-test. Must accept bytes.
-                        Exceptions are considered crashes.
-        close_stderr:   Close standard error when starting fuzzing process.
-        close_stdout:   Close standard output when starting fuzzing process.
-        stat_frequency: Frequency in which to produce a statistics if no other events are logged.
-        max_crashes:    Number of crashes after which to exit the fuzzer.
-        max_input_size: Maximum length of input to create.
-        max_runs:       Number of target executions after which to exit the fuzzer.
-        max_time:       Number of seconds after which to exit the fuzzer.
-        num_workers:    Number of parallel workers.
-                        Use None to spawn one fewer than CPUs available.
-        regression:     Execute target on all samples found in crash_dir, print errors and exit.
-        seeds:          List of files and directories to seed the fuzzer with.
-        start_method:   Multiprocessing start method to use (spawn, forkserver or fork).
-                        Defaults to "spawn". Do not use "fork" as it is unreliable and may lead
-                        to deadlocks.
-        state_file:     File to load state from. Will be updated periodically. If no file is
-                        specified, the state will be held in memory and discarded on exit.
-        load_crashes:   Load crashes from crash directory on startup.
+        crash_dir:          Directory to store crash artifacts in. Will be created if missing.
+        target:             Python function to fuzz-test. Must accept bytes.
+                            Exceptions are considered crashes.
+        adaptive:           Adapt mutation probabilities according to how successfully new paths
+                            and crashes are discovered.
+        close_stderr:       Close standard error when starting fuzzing process.
+        close_stdout:       Close standard output when starting fuzzing process.
+        stat_frequency:     Frequency in which to produce a statistics if no other events are
+                            logged.
+        max_crashes:        Number of crashes after which to exit the fuzzer.
+        max_input_size:     Maximum length of input to create.
+        max_insert_length:  Maximum number of bytes to insert during mutation.
+        max_modifications:  Maximum number of consecutive modifications during mutation.
+        max_runs:           Number of target executions after which to exit the fuzzer.
+        max_time:           Number of seconds after which to exit the fuzzer.
+        num_workers:        Number of parallel workers.
+                            Use None to spawn one fewer than CPUs available.
+        regression:         Execute target on all samples found in crash_dir, print errors and exit.
+        seeds:              List of files and directories to seed the fuzzer with.
+        start_method:       Multiprocessing start method to use (spawn, forkserver or fork).
+                            Defaults to "spawn". Do not use "fork" as it is unreliable and may lead
+                            to deadlocks.
+        state_file:         File to load state from. Will be updated periodically. If no file is
+                            specified, the state will be held in memory and discarded on exit.
+        load_crashes:       Load crashes from crash directory on startup.
         """
 
         self._current_crashes = 0
@@ -242,7 +250,14 @@ class Fuzzer:
         self._max_runs = max_runs
         self._max_time = max_time
         self._num_workers: int = num_workers or self._mp_ctx.cpu_count() - 1
-        self._state = st.State(seeds=seeds, max_input_size=max_input_size, file=state_file)
+        self._state = st.State(
+            seeds=seeds,
+            adaptive=adaptive,
+            max_input_size=max_input_size,
+            max_modifications=max_modifications,
+            max_insert_length=max_insert_length,
+            file=state_file,
+        )
 
         if load_crashes:
             self._load_crashes(regression=regression)
