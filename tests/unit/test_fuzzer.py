@@ -121,6 +121,20 @@ def test_crash_hard(tmp_path: Path) -> None:
     assert crash_dir.is_dir()
 
 
+def test_crash_hard_non_adaptive(tmp_path: Path) -> None:
+    crash_dir = tmp_path / "crashes"
+    f = fuzzer.Fuzzer(
+        target=crashing_target_hard,
+        adaptive=False,
+        crash_dir=crash_dir,
+        max_crashes=1,
+        max_time=60,
+    )
+    with pytest.raises(SystemExit, match="^1$"):
+        f.start()
+    assert crash_dir.is_dir()
+
+
 def test_crash_with_crash_dir(tmp_path: Path) -> None:
     crash_dir = tmp_path / "crashes"
     f = fuzzer.Fuzzer(
