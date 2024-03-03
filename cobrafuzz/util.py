@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+from abc import abstractmethod
 from typing import Generator, Generic, Optional, TypeVar
 
 from . import common
@@ -9,6 +10,7 @@ PopulationType = TypeVar("PopulationType")
 
 
 class ParamBase(Generic[PopulationType]):
+    @abstractmethod
     def update(self, success: bool = False) -> None:
         raise NotImplementedError
 
@@ -56,7 +58,7 @@ class AdaptiveRange(AdaptiveRandBase[int]):
             self._distribution.append(1)
 
         self._distribution[0] += 1
-        self._last_index = 0
+        self._last_index = 1
 
     def _fail(self) -> None:
         if not self._adaptive or not self._last_index:
@@ -76,8 +78,6 @@ class AdaptiveRange(AdaptiveRandBase[int]):
             raise common.OutOfBoundsError(
                 f"Lower bound must be lower than upper bound ({lower} > {upper})",
             )
-        if upper == lower:
-            return upper
         if not self._adaptive:
             return random.randint(lower, upper)  # noqa: S311
         self._last_value = random.choices(self._population, self._distribution)[0]  # noqa: S311
@@ -91,8 +91,7 @@ class AdaptiveRange(AdaptiveRandBase[int]):
 class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
     def __init__(self, population: Optional[list[PopulationType]], adaptive: bool = True) -> None:
         self._population = population or []
-        self._adaptive = adaptive
-        self._distribution = [1 for _ in self._population]
+        self._distribution = [1 for _ in self._population] if adaptive else None
         self._last: Optional[PopulationType] = None
 
     def __len__(self) -> int:
@@ -102,23 +101,23 @@ class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
         yield from self._population
 
     def _succeed(self) -> None:
-        if not self._adaptive or self._last is None:
+        if self._distribution is None or self._last is None:
             return
         self._distribution[self._population.index(self._last)] += 1
 
     def _fail(self) -> None:
-        if not self._adaptive or self._last is None:
+        if self._distribution is None or self._last is None:
             return
         if self._distribution[self._population.index(self._last)] > 1:
             self._distribution[self._population.index(self._last)] -= 1
 
     def append(self, element: PopulationType) -> None:
         self._population.append(element)
-        if self._adaptive:
+        if self._distribution is not None:
             self._distribution.append(1)
 
     def sample(self) -> PopulationType:
-        if not self._adaptive:
+        if self._distribution is None:
             return random.choice(self._population)  # noqa: S311
         self._last = random.choices(self._population, self._distribution, k=1)[0]  # noqa: S311
         return self._last
