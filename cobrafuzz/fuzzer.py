@@ -84,7 +84,7 @@ def worker(  # noqa: PLR0913
     state: st.State,
 ) -> None:
     try:
-        _worker_run(
+        worker_loop(
             wid=wid,
             target_bytes=target_bytes,
             update_queue=update_queue,
@@ -94,11 +94,14 @@ def worker(  # noqa: PLR0913
             stat_frequency=stat_frequency,
             state=state,
         )
+    except KeyboardInterrupt:  # pragma: no cover
+        sys.settrace(None)
+        raise
     except Exception:  # noqa: BLE001
         result_queue.put(Bug(wid=wid, message=traceback.format_exc()))
 
 
-def _worker_run(  # noqa: PLR0913
+def worker_loop(  # noqa: PLR0913
     wid: int,
     target_bytes: bytes,
     update_queue: mp.Queue[Update],
@@ -122,52 +125,66 @@ def _worker_run(  # noqa: PLR0913
     if close_stderr:
         sys.stderr = NullFile()
 
-    runs = 0
-    last_status = time.time()
     target = cast(Callable[[bytes], None], pickle.loads(target_bytes))  # noqa: S301
 
     tracer.initialize()
 
+    runs = 0
+    last_status = time.time()
+
     while True:
         tracer.reset()
+        runs += 1
 
         while not update_queue.empty():
             update = update_queue.get()
             state.store_coverage(update.covered)
             state.put_input(bytearray(update.data))
 
-        runs += 1
-        data = state.get_input()
+        result = _worker_run(
+            wid=wid,
+            target=target,
+            state=state,
+            runs=runs,
+        )
 
-        try:
-            target(bytes(data))
-        except Exception as e:  # noqa: BLE001
-            result_queue.put(
-                Error(
-                    wid=wid,
-                    runs=runs,
-                    data=data,
-                    covered=covered(e),
-                    message=f"{traceback.format_exc()}",
-                ),
-            )
-            runs = 0
-            last_status = time.time()
-            state.update(success=True)
-        else:
-            new_path = state.store_coverage(data=tracer.get_covered())
-            if new_path:
-                result_queue.put(
-                    Report(wid=wid, runs=runs, data=data, covered=tracer.get_covered()),
-                )
-                runs = 0
-                last_status = time.time()
-                state.update(success=True)
-            elif time.time() - last_status > stat_frequency:
-                result_queue.put(Status(wid=wid, runs=runs))
-                runs = 0
-                last_status = time.time()
-                state.update(success=False)
+        if type(result) == Status and time.time() - last_status <= stat_frequency:
+            continue
+
+        runs = 0
+        last_status = time.time()
+        result_queue.put(result)
+
+
+def _worker_run(
+    wid: int,
+    target: Callable[[bytes], None],
+    state: st.State,
+    runs: int,
+) -> StatusBase:
+    tracer.reset()
+
+    data = state.get_input()
+
+    try:
+        target(bytes(data))
+    except Exception as e:  # noqa: BLE001
+        return Error(
+            wid=wid,
+            runs=runs,
+            data=data,
+            covered=covered(e),
+            message=f"{traceback.format_exc()}",
+        )
+
+    new_path = state.store_coverage(data=tracer.get_covered())
+
+    if new_path:
+        state.update(success=True)
+        return Report(wid=wid, runs=runs, data=data, covered=tracer.get_covered())
+
+    state.update(success=False)
+    return Status(wid=wid, runs=runs)
 
 
 class Fuzzer:

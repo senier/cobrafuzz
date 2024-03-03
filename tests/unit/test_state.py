@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import json
 import logging
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -104,3 +107,20 @@ def test_fail_load_invalid_file_path(caplog: pytest.LogCaptureFixture, tmp_path:
     with caplog.at_level(logging.INFO):
         state.State(file=tmp_path)
     assert f"[Errno 21] Is a directory: '{tmp_path}'" in caplog.text, caplog.text
+
+
+@pytest.mark.parametrize("success", [True, False])
+def test_update(monkeypatch: pytest.MonkeyPatch, success: bool) -> None:
+    class MockMutator:
+        def __init__(self) -> None:
+            self.success: Optional[bool] = None
+
+        def update(self, success: bool) -> None:
+            self.success = success
+
+    with monkeypatch.context() as mp:
+        s = state.State()
+        m = MockMutator()
+        mp.setattr(s, "_mutator", m)
+        s.update(success=success)
+        assert m.success == success
