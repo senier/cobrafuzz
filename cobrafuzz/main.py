@@ -1,4 +1,5 @@
 import argparse
+import sys
 from pathlib import Path
 from typing import Callable
 
@@ -97,4 +98,7 @@ class CobraFuzz:
             start_method=args.start_method,
             state_file=args.state_file,
         )
-        f.start()
+        try:
+            f.start()
+        except KeyboardInterrupt:
+            sys.exit("\nUser cancellation. Exiting.\n")
