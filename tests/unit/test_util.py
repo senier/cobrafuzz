@@ -1,8 +1,9 @@
-import random
+# ruff: noqa: SLF001
 
-import numpy as np
+import random
+from copy import deepcopy
+
 import pytest
-from scipy.stats import chisquare
 
 from cobrafuzz import common, util
 
@@ -94,7 +95,7 @@ def test_insert_valid(data: bytes, start: int, data_to_insert: bytes, expected: 
     assert tmp == expected
 
 
-def test_adaptive_rand_invalid_bounds() -> None:
+def test_adaptive_range_invalid_bounds() -> None:
     r = util.AdaptiveRange()
     with pytest.raises(
         common.OutOfBoundsError,
@@ -103,7 +104,37 @@ def test_adaptive_rand_invalid_bounds() -> None:
         r.sample(10, 0)
 
 
-def test_adaptive_rand_in_range() -> None:
+def test_adaptive_range_update() -> None:
+    r = util.AdaptiveRange()
+    v = r.sample(lower=1, upper=1)
+    assert v == 1
+    assert r._population == [None]
+    assert r._distribution == [1]
+
+    r.update(success=True)
+    assert r._population == [None, 1]
+    assert r._distribution == [2, 1]
+
+    v = r.sample(lower=1, upper=1)
+    assert v == 1
+    assert r._population == [None, 1]
+    assert r._distribution == [2, 1]
+
+    r.update(success=True)
+    assert r._population == [None, 1]
+    assert r._distribution == [3, 2]
+
+    v = r.sample(lower=1, upper=1)
+    assert v == 1
+    assert r._population == [None, 1]
+    assert r._distribution == [3, 2]
+
+    r.update(success=False)
+    assert r._population == [None, 1]
+    assert r._distribution == [2, 1]
+
+
+def test_adaptive_range_in_range() -> None:
     for _ in range(1, 1000):
         lower = random.randint(0, 1000)  # noqa: S311
         upper = random.randint(lower, 1000)  # noqa: S311
@@ -112,58 +143,77 @@ def test_adaptive_rand_in_range() -> None:
         assert lower <= sample <= upper
 
 
-def test_adaptive_rand_uniform() -> None:
+@pytest.mark.parametrize("success", [True, False])
+def test_non_adaptive_range(success: bool) -> None:
+    def eq(l: util.AdaptiveRange, r: util.AdaptiveRange) -> bool:
+        return (
+            l._adaptive == r._adaptive
+            and l._population == r._population
+            and l._distribution == r._distribution
+            and l._last_index == r._last_index
+            and l._last_value == r._last_value
+        )
+
+    r = util.AdaptiveRange(adaptive=False)
+    v = r.sample(lower=1, upper=1)
+    assert v == 1
+    c = deepcopy(r)
+    assert eq(r, c)
+    r.update(success=success)
+    assert eq(r, c)
+
+
+def test_adaptive_range_drop_entry() -> None:
     r = util.AdaptiveRange()
-    data = [r.sample(lower=0, upper=1000) for _ in range(1, 100000)]
-    result = chisquare(f_obs=list(np.bincount(data)))
-    assert result.pvalue > 0.05
-
-
-def test_adaptive_rand_update() -> None:
-    r = util.AdaptiveRange()
-    r.update()
-    for _ in range(10000):
-        r.update(success=r.sample(lower=1, upper=10) > 5)
-    data = [r.sample(lower=1, upper=10) for _ in range(1000)]
-    assert len([d for d in data if d <= 5]) / len(data) < 0.3, data
-
-
-def test_adaptive_choice_update() -> None:
-    r = util.AdaptiveChoiceBase(population=["a", "b", "c"])
-    r.update()
+    v = r.sample(upper=1, lower=1)
+    assert v == 1
     r.update(success=True)
-    for _ in range(100000):
-        r.update(success=r.sample() != "a")
-    data = [r.sample() for _ in range(1, 1000)]
-    assert all(d != "a" for d in data), data
+    assert r._population == [None, 1]
+    v = r.sample(upper=1, lower=1)
+    assert v == 1
+    r.update(success=False)
+    assert r._population == [None]
 
 
-def test_large_adaptive_range_uniform() -> None:  # pragma: no cover
-    for _ in range(5):
-        r = util.AdaptiveRange()
-        data = [r.sample(0, 2**16 - 1) for _ in range(1, 10000)]
-        result = chisquare(f_obs=list(np.bincount(data)))
-        if result.pvalue > 0.05:
-            break
-    else:
-        pytest.fail("Non-uniform random numbers")
+def test_param() -> None:
+    p = util.Param(5)
+    assert p() == 5
+    p.update()
+    assert p() == 5
 
 
-def test_large_adaptive_range_update() -> None:
-    upper = 100
-    r = util.AdaptiveRange()
-    for _ in range(1, 10000):
-        r.update(success=r.sample(1, upper) < upper / 2)
-    data = [r.sample(1, upper) for _ in range(1, upper)]
-    assert len([d for d in data if d < upper / 2]) / len(data) >= 0.6
+def test_adaptive_choice() -> None:
+    c = util.AdaptiveChoiceBase(population=[1], adaptive=True)
+    assert c._population == [1]
+    assert c._distribution == [1]
+    v = c.sample()
+    assert v == 1
+    c.update(success=True)
+    assert c._population == [1]
+    assert c._distribution == [2]
+    c.update(success=False)
+    assert c._population == [1]
+    assert c._distribution == [1]
+    c.update(success=False)
+    assert c._population == [1]
+    assert c._distribution == [1]
+    c.append(2)
+    assert c._population == [1, 2]
+    assert c._distribution == [1, 1]
 
 
-def test_large_adaptive_range_preferred_value() -> None:
-    r = util.AdaptiveRange()
-    for _ in range(1, 1000):
-        r.update(success=r.sample(1, 10) == 5)
-    assert len([d for d in [r.sample(1, 10) for _ in range(1, 100)] if d == 5]) > 40
-
-    for _ in range(1, 10000):
-        r.update(success=r.sample(1, 10) != 5)
-    assert len([d for d in [r.sample(1, 10) for _ in range(1, 100)] if d == 5]) < 20
+def test_non_adaptive_choice() -> None:
+    c = util.AdaptiveChoiceBase(population=[1], adaptive=False)
+    assert c._population == [1]
+    assert c._distribution is None
+    v = c.sample()
+    assert v == 1
+    c.update(success=True)
+    assert c._population == [1]
+    assert c._distribution is None
+    c.update(success=False)
+    assert c._population == [1]
+    assert c._distribution is None
+    c.append(2)
+    assert c._population == [1, 2]
+    assert c._distribution is None

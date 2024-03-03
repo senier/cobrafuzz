@@ -1,4 +1,8 @@
+# ruff: noqa: SLF001
+
 from __future__ import annotations
+
+from typing import Optional
 
 import pytest
 
@@ -12,6 +16,15 @@ class StaticRand(util.AdaptiveRange):
 
     def sample(self, _lower: int, _upper: int) -> int:
         return self._value
+
+
+class Param(util.Param):
+    def __init__(self, value: int):
+        self.success: Optional[bool] = None
+        super().__init__(value)
+
+    def update(self, success: bool = False) -> None:
+        self.success = success
 
 
 class StaticIntChoice(util.AdaptiveChoiceBase[int]):
@@ -32,12 +45,11 @@ def test_mutate(monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as mp:
         mp.setattr(m, "_mutators", util.AdaptiveChoiceBase([(modify, None)]))
         mp.setattr(m, "_modifications", StaticRand(1))
-        assert m._mutate(bytearray(b"0123456789")) == bytearray(b"a0123456789b")  # noqa: SLF001
+        assert m._mutate(bytearray(b"0123456789")) == bytearray(b"a0123456789b")
 
 
 def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
     m = mutator.Mutator()
-    m.update()
 
     def modify(data: bytearray, _: mutator.Params) -> None:
         if data[0] != 0:
@@ -45,20 +57,20 @@ def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with monkeypatch.context() as mp:
         mp.setattr(m, "_mutators", util.AdaptiveChoiceBase([(modify, None)]))
-        assert m._mutate(bytearray(b"0123456789")) == bytearray(b"\x00123456789")  # noqa: SLF001
+        assert m._mutate(bytearray(b"0123456789")) == bytearray(b"\x00123456789")
 
 
 def test_mutate_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
     m = mutator.Mutator(max_input_size=4)
     with monkeypatch.context() as mp:
         mp.setattr(m, "_mutators", util.AdaptiveChoiceBase([(lambda _data, _: None, None)]))
-        assert m._mutate(bytearray(b"0123456789")) == bytearray(b"0123")  # noqa: SLF001
+        assert m._mutate(bytearray(b"0123456789")) == bytearray(b"0123")
 
 
 def test_mutate_remove_range_of_bytes_fail() -> None:
     res = bytearray()
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_remove_range_of_bytes(res, mutator.Params())  # noqa: SLF001
+        mutator._mutate_remove_range_of_bytes(res, mutator.Params())
 
 
 @pytest.mark.parametrize(
@@ -77,7 +89,7 @@ def test_mutate_remove_range_of_bytes_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_remove_range_of_bytes(  # noqa: SLF001
+    mutator._mutate_remove_range_of_bytes(
         tmp,
         mutator.Params(
             start=StaticRand(start),
@@ -103,7 +115,7 @@ def test_mutate_insert_range_of_bytes_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_insert_range_of_bytes(  # noqa: SLF001
+    mutator._mutate_insert_range_of_bytes(
         tmp,
         mutator.Params(
             start=StaticRand(start),
@@ -119,7 +131,7 @@ def test_mutate_duplicate_range_of_bytes_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_duplicate_range_of_bytes(data, mutator.Params())  # noqa: SLF001
+        mutator._mutate_duplicate_range_of_bytes(data, mutator.Params())
 
 
 @pytest.mark.parametrize(
@@ -142,7 +154,7 @@ def test_mutate_duplicate_range_of_bytes_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_duplicate_range_of_bytes(  # noqa: SLF001
+    mutator._mutate_duplicate_range_of_bytes(
         tmp,
         mutator.Params(
             src_pos=StaticRand(start),
@@ -157,7 +169,7 @@ def test_mutate_copy_range_of_bytes_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_copy_range_of_bytes(data, mutator.Params())  # noqa: SLF001
+        mutator._mutate_copy_range_of_bytes(data, mutator.Params())
 
 
 @pytest.mark.parametrize(
@@ -179,7 +191,7 @@ def test_mutate_copy_range_of_bytes_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_copy_range_of_bytes(  # noqa: SLF001
+    mutator._mutate_copy_range_of_bytes(
         tmp,
         mutator.Params(
             src_pos=StaticRand(start),
@@ -194,7 +206,7 @@ def test_mutate_bit_flip_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_bit_flip(data, mutator.Params())  # noqa: SLF001
+        mutator._mutate_bit_flip(data, mutator.Params())
 
 
 @pytest.mark.parametrize(
@@ -214,7 +226,7 @@ def test_mutate_bit_flip_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_bit_flip(  # noqa: SLF001
+    mutator._mutate_bit_flip(
         tmp,
         mutator.Params(
             bit_pos=StaticRand(bit),
@@ -228,7 +240,7 @@ def test_mutate_flip_random_bits_of_random_byte_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_flip_random_bits_of_random_byte(data, mutator.Params())  # noqa: SLF001
+        mutator._mutate_flip_random_bits_of_random_byte(data, mutator.Params())
 
 
 @pytest.mark.parametrize(
@@ -247,7 +259,7 @@ def test_mutate_flip_random_bits_of_random_byte_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_flip_random_bits_of_random_byte(  # noqa: SLF001
+    mutator._mutate_flip_random_bits_of_random_byte(
         tmp,
         mutator.Params(
             pos=StaticRand(byte),
@@ -261,7 +273,7 @@ def test_mutate_swap_two_bytes_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_swap_two_bytes(data, mutator.Params())  # noqa: SLF001
+        mutator._mutate_swap_two_bytes(data, mutator.Params())
 
 
 @pytest.mark.parametrize(
@@ -284,7 +296,7 @@ def test_mutate_swap_two_bytes(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_swap_two_bytes(  # noqa: SLF001
+    mutator._mutate_swap_two_bytes(
         tmp,
         mutator.Params(
             first_pos=StaticRand(source),
@@ -298,7 +310,7 @@ def test_mutate_add_subtract_from_a_byte_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_add_subtract_from_a_byte(data, mutator.Params())  # noqa: SLF001
+        mutator._mutate_add_subtract_from_a_byte(data, mutator.Params())
 
 
 @pytest.mark.parametrize(
@@ -321,7 +333,7 @@ def test_mutate_add_subtract_from_a_byte_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_add_subtract_from_a_byte(  # noqa: SLF001
+    mutator._mutate_add_subtract_from_a_byte(
         tmp,
         mutator.Params(
             value=StaticRand(value),
@@ -335,7 +347,7 @@ def test_mutate_add_subtract_from_a_uint16_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_add_subtract_from_a_uint16(data, mutator.Params())  # noqa: SLF001
+        mutator._mutate_add_subtract_from_a_uint16(data, mutator.Params())
 
 
 @pytest.mark.parametrize(
@@ -356,7 +368,7 @@ def test_mutate_add_subtract_from_a_uint16_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_add_subtract_from_a_uint16(  # noqa: SLF001
+    mutator._mutate_add_subtract_from_a_uint16(
         tmp,
         mutator.Params(
             value=StaticRand(value),
@@ -371,7 +383,7 @@ def test_mutate_add_subtract_from_a_uint32_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_add_subtract_from_a_uint32(data, mutator.Params())  # noqa: SLF001
+        mutator._mutate_add_subtract_from_a_uint32(data, mutator.Params())
 
 
 @pytest.mark.parametrize(
@@ -392,7 +404,7 @@ def test_mutate_add_subtract_from_a_uint32_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_add_subtract_from_a_uint32(  # noqa: SLF001
+    mutator._mutate_add_subtract_from_a_uint32(
         tmp,
         mutator.Params(
             value=StaticRand(value),
@@ -407,7 +419,7 @@ def test_mutate_add_subtract_from_a_uint64_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_add_subtract_from_a_uint64(data, mutator.Params())  # noqa: SLF001
+        mutator._mutate_add_subtract_from_a_uint64(data, mutator.Params())
 
 
 @pytest.mark.parametrize(
@@ -428,7 +440,7 @@ def test_mutate_add_subtract_from_a_uint64_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_add_subtract_from_a_uint64(  # noqa: SLF001
+    mutator._mutate_add_subtract_from_a_uint64(
         tmp,
         mutator.Params(
             value=StaticRand(value),
@@ -443,7 +455,7 @@ def test_mutate_replace_a_byte_with_an_interesting_value_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_replace_a_byte_with_an_interesting_value(  # noqa: SLF001
+        mutator._mutate_replace_a_byte_with_an_interesting_value(
             data,
             mutator.Params(),
         )
@@ -468,7 +480,7 @@ def test_mutate_replace_a_byte_with_an_interesting_value_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_replace_a_byte_with_an_interesting_value(  # noqa: SLF001
+    mutator._mutate_replace_a_byte_with_an_interesting_value(
         tmp,
         mutator.Params(
             interesting_8=StaticIntChoice(value),
@@ -482,7 +494,7 @@ def test_mutate_replace_an_uint16_with_an_interesting_value_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_replace_an_uint16_with_an_interesting_value(  # noqa: SLF001
+        mutator._mutate_replace_an_uint16_with_an_interesting_value(
             data,
             mutator.Params(),
         )
@@ -508,7 +520,7 @@ def test_mutate_replace_an_uint16_with_an_interesting_value_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_replace_an_uint16_with_an_interesting_value(  # noqa: SLF001
+    mutator._mutate_replace_an_uint16_with_an_interesting_value(
         tmp,
         mutator.Params(
             interesting_16=StaticIntChoice(value),
@@ -523,7 +535,7 @@ def test_mutate_replace_an_uint32_with_an_interesting_value_fail() -> None:
     data = bytearray(b"")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_replace_an_uint32_with_an_interesting_value(  # noqa: SLF001
+        mutator._mutate_replace_an_uint32_with_an_interesting_value(
             data,
             mutator.Params(),
         )
@@ -549,7 +561,7 @@ def test_mutate_replace_an_uint32_with_an_interesting_value_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_replace_an_uint32_with_an_interesting_value(  # noqa: SLF001
+    mutator._mutate_replace_an_uint32_with_an_interesting_value(
         tmp,
         mutator.Params(
             interesting_32=StaticIntChoice(value),
@@ -564,7 +576,7 @@ def test_mutate_replace_an_ascii_digit_with_another_digit_fail() -> None:
     data = bytearray(b"no digits present")
 
     with pytest.raises(common.OutOfDataError):
-        mutator._mutate_replace_an_ascii_digit_with_another_digit(  # noqa: SLF001
+        mutator._mutate_replace_an_ascii_digit_with_another_digit(
             data,
             mutator.Params(),
         )
@@ -588,7 +600,7 @@ def test_mutate_replace_an_ascii_digit_with_another_digit_success(
 ) -> None:
     tmp = bytearray(data)
 
-    mutator._mutate_replace_an_ascii_digit_with_another_digit(  # noqa: SLF001
+    mutator._mutate_replace_an_ascii_digit_with_another_digit(
         tmp,
         mutator.Params(
             pos=StaticRand(position),
@@ -596,3 +608,69 @@ def test_mutate_replace_an_ascii_digit_with_another_digit_success(
         ),
     )
     assert tmp == expected
+
+
+def test_update_params() -> None:
+    p1 = Param(1)
+    p2 = Param(2)
+    p = mutator.Params(p1=p1, p2=p2)
+
+    assert p1.success is None
+    assert p2.success is None
+
+    p.update(success=True)
+    assert p1.success
+    assert p2.success  # type: ignore[unreachable]
+
+    p.update(success=False)
+    assert not p1.success
+    assert not p2.success
+
+
+fail = True
+
+
+def test_mutator_detect_out_of_data_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def raise_out_of_data(_res: bytearray, _params: mutator.Params) -> None:
+        global fail  # noqa: PLW0603
+        if fail:
+            fail = False
+            raise common.OutOfDataError
+
+    with monkeypatch.context() as mp:
+        m = mutator.Mutator()
+        mp.setattr(
+            m,
+            "_mutators",
+            util.AdaptiveChoiceBase(
+                population=[(raise_out_of_data, mutator.Params())],
+            ),
+        )
+        mp.setattr(m, "_modifications", StaticRand(2))
+        m._mutate(bytearray(b"deadbeef"))
+
+
+def test_mutator_update(monkeypatch: pytest.MonkeyPatch) -> None:
+    def mutate_noop(_res: bytearray, _params: mutator.Params) -> None:
+        pass
+
+    with monkeypatch.context() as mp:
+        p1 = Param(1)
+        m = mutator.Mutator()
+        mp.setattr(
+            m,
+            "_mutators",
+            util.AdaptiveChoiceBase(
+                population=[(mutate_noop, mutator.Params(p1=p1))],
+            ),
+        )
+        mp.setattr(m, "_modifications", StaticRand(1))
+        m._mutate(bytearray(b"deadbeef"))
+
+        assert p1.success is None
+        m.update(success=True)
+        assert p1.success
+
+    with monkeypatch.context() as mp:  # type: ignore[unreachable]
+        m = mutator.Mutator()
+        m.update(success=True)
