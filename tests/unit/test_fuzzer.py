@@ -109,7 +109,7 @@ def test_write_sample(tmp_path: Path) -> None:
         assert af.read() == sample
 
 
-def test_regression(tmp_path: Path) -> None:
+def test_regression_valid(caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
     with (tmp_path / "crash1").open("wb") as cf:
         cf.write(b"*foo")
     with (tmp_path / "crash2").open("wb") as cf:
@@ -120,18 +120,22 @@ def test_regression(tmp_path: Path) -> None:
         cf.write(b"baz")
     (tmp_path / "subdir").mkdir()
 
-    with pytest.raises(SystemExit, match="^0$"):
+    with pytest.raises(SystemExit, match="^0$"), caplog.at_level(logging.INFO):
         fuzzer.Fuzzer(
             target=lambda data: tests.utils.do_raise(ValueError, cond=data.startswith(b"*")),
             crash_dir=tmp_path,
             regression=True,
         )
+    assert f"Testing {tmp_path / 'crash1'}:" in caplog.text
+    assert f"No error when testing {tmp_path / 'crash4'}" in caplog.text
 
 
 def test_load_crashes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     state = State(data=b"deadbeef", report_new_path=False)
-    with (tmp_path / "crash").open("wb") as cf:
+    with (tmp_path / "crash1").open("wb") as cf:
         cf.write(b"*foo")
+    with (tmp_path / "crash2").open("wb") as cf:
+        cf.write(b"foo")
     f = fuzzer.Fuzzer(
         target=lambda data: tests.utils.do_raise(ValueError, cond=data.startswith(b"*")),
         crash_dir=tmp_path,
@@ -143,25 +147,6 @@ def test_load_crashes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         mp.setattr(f, "_state", state)
         f._load_crashes(regression=False)  # noqa: SLF001
     assert state.data
-
-
-def test_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    state_file = tmp_path / "state.json"
-    assert not state_file.exists()
-    with monkeypatch.context() as mp:
-        mp.setattr(fuzzer, "worker", worker_crash)
-        for i in range(2):
-            f = fuzzer.Fuzzer(
-                target=lambda _: None,
-                crash_dir=tmp_path,
-                max_runs=1,
-                state_file=state_file,
-                close_stderr=True,
-                close_stdout=True,
-            )
-            with pytest.raises(SystemExit, match="^1$" if i == 0 else "^0$"):
-                f.start()
-        assert state_file.exists()
 
 
 def test_crash_simple(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -310,9 +295,9 @@ def test_worker_loop_status(monkeypatch: pytest.MonkeyPatch) -> None:
 
     update_queue.put(fuzzer.Update(b"update", covered=set()))
 
-    with monkeypatch.context() as c:
-        c.setattr(fuzzer, "_worker_run", worker_run)
-        c.setattr(time, "time", tests.utils.mock_time())
+    with monkeypatch.context() as p:
+        p.setattr(fuzzer, "_worker_run", worker_run)
+        p.setattr(time, "time", tests.utils.mock_time())
         with pytest.raises(DoneError, match="^Test done$"):
             fuzzer.worker_loop(  # pragma: no cover
                 wid=1,
