@@ -291,7 +291,7 @@ class Fuzzer:
         target = cast(Callable[[bytes], None], pickle.loads(self._target_bytes))  # noqa: S301
         local_state = st.State()
 
-        for error_file in self._crash_dir.glob("*"):
+        for error_file in sorted(self._crash_dir.glob("*")):
             if not error_file.is_file():
                 continue
             with error_file.open("br") as f:
@@ -301,16 +301,17 @@ class Fuzzer:
                     if regression:
                         changed = local_state.store_coverage(covered(e))
                         if changed:
-                            logging.exception(
+                            logging.info(
                                 "\n========================================================================\n"
-                                "Testing %s:",
+                                "Testing %s:\n%s",
                                 error_file,
+                                traceback.format_exc(),
                             )
                     else:
                         self._state.store_coverage(covered(e))
                 else:
                     if regression:
-                        logging.error("No error when testing %s", error_file)
+                        logging.info("No error when testing %s", error_file)
 
         if regression:
             sys.exit(0)
