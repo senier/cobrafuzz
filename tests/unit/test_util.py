@@ -129,6 +129,11 @@ def test_adaptive_range_update() -> None:
     assert r._population == [None, 1]
     assert r._distribution == [3, 2]
 
+    v = r.sample(lower=1, upper=1)
+    assert v == 1
+    assert r._population == [None, 1]
+    assert r._distribution == [3, 2]
+
     r.update(success=False)
     assert r._population == [None, 1]
     assert r._distribution == [2, 1]

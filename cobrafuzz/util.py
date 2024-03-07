@@ -84,7 +84,7 @@ class AdaptiveRange(AdaptiveRandBase[int]):
         if self._last_value is None or self._last_value < lower or self._last_value > upper:
             self._last_value = random.randint(lower, upper)  # noqa: S311
         else:
-            self._last_index = self._population.index(self._last_value)
+            self._last_index = self._population.index(self._last_value)  # pragma: no cover
         return self._last_value
 
 
