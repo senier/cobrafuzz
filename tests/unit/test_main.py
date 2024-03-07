@@ -1,41 +1,26 @@
 from __future__ import annotations
 
-import logging
-import multiprocessing as mp
 import sys
 from pathlib import Path
+from typing import Optional, Union
 
 import pytest
 
-import tests.utils
-from cobrafuzz import fuzzer, state as st
+from cobrafuzz import fuzzer
 from cobrafuzz.main import CobraFuzz
 
 
-def worker_crash(
-    wid: int,
-    _target_bytes: bytes,
-    _update_queue: mp.Queue[fuzzer.Update],
-    result_queue: mp.Queue[fuzzer.StatusBase],
-    _close_stdout: bool,
-    _close_stderr: bool,
-    _stat_frequency: int,
-    _state: st.State,
-) -> None:
-    print("worker on stdout")  # noqa: T201
-    print("worker on stderr", file=sys.stderr)  # noqa: T201
-    result_queue.put(
-        fuzzer.Error(
-            wid=wid,
-            runs=1000,
-            data=b"deadbeef",
-            covered={("a", 1, "b", 2)},
-            message="worker crashed",
-        ),
-    )
-
-
 def test_main(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    args: Optional[dict[str, Union[bool, int, Path]]] = None
+
+    class Fuzzer:
+        def __init__(self, **a: Union[bool, int, Path]) -> None:
+            nonlocal args
+            args = a
+
+        def start(self) -> None:
+            pass
+
     with monkeypatch.context() as mp:
         mp.setattr(
             sys,
@@ -50,13 +35,23 @@ def test_main(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
                 "1",
             ],
         )
-        mp.setattr(fuzzer, "worker", worker_crash)
+        mp.setattr(fuzzer, "Fuzzer", Fuzzer)
         c = CobraFuzz(lambda _: None)  # pragma: no cover
-        with pytest.raises(SystemExit, match="^1$"):
-            c()
+        c()
+        assert args is not None
+        assert args["crash_dir"] == tmp_path
+        assert args["max_runs"] == 500
+        assert args["max_crashes"] == 1
 
 
 def test_keyboard_interrupt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    class Fuzzer:
+        def __init__(self, **_: dict[str, Union[bool, int, Path]]) -> None:
+            pass
+
+        def start(self) -> None:
+            raise KeyboardInterrupt
+
     with monkeypatch.context() as mp:
         mp.setattr(
             sys,
@@ -71,7 +66,7 @@ def test_keyboard_interrupt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
                 "1",
             ],
         )
-        mp.setattr(logging, "info", lambda *_: tests.utils.do_raise(KeyboardInterrupt))
+        mp.setattr(fuzzer, "Fuzzer", Fuzzer)
         c = CobraFuzz(func=lambda _: None)  # pragma: no cover
         with pytest.raises(SystemExit, match=r"^\nUser cancellation\. Exiting\.\n$"):
             c()
