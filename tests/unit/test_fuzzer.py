@@ -622,7 +622,7 @@ def test_initialize_process(monkeypatch: pytest.MonkeyPatch) -> None:
         p.setattr(f, "_state", s)
         p.setattr(f, "_result_queue", qr)
         result, _ = cast(
-            tuple[DummyProcess, DummyQueue[fuzzer.Update]],
+            Tuple[DummyProcess, DummyQueue[fuzzer.Update]],
             f._initialize_process(wid=0),  # noqa: SLF001
         )
         assert result.args[0] == 0
