@@ -58,6 +58,7 @@ def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as mp:
         mp.setattr(m, "_mutators", util.AdaptiveChoiceBase([(modify, None)]))
         assert m._mutate(bytearray(b"0123456789")) == bytearray(b"\x00123456789")
+        assert m._mutate(bytearray(b"\x00123456789")) == bytearray(b"\x00123456789")
 
 
 def test_mutate_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -610,7 +611,13 @@ def test_mutate_replace_an_ascii_digit_with_another_digit_success(
     assert tmp == expected
 
 
-def test_update_params() -> None:
+def test_params_invalid() -> None:
+    p = mutator.Params()
+    with pytest.raises(AttributeError, match="^'Params' object has no attribute '_invalid'$"):
+        _x = p._invalid
+
+
+def test_params_update() -> None:
     p1 = Param(1)
     p2 = Param(2)
     p = mutator.Params(p1=p1, p2=p2)
@@ -627,12 +634,11 @@ def test_update_params() -> None:
     assert not p2.success
 
 
-fail = True
-
-
 def test_mutator_detect_out_of_data_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    fail = True
+
     def raise_out_of_data(_res: bytearray, _params: mutator.Params) -> None:
-        global fail  # noqa: PLW0603
+        nonlocal fail
         if fail:
             fail = False
             raise common.OutOfDataError
