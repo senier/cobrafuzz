@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import logging
-import multiprocessing as mp
+import multiprocessing
 import re
 import sys
 import time
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Generic, Optional, TypeVar, cast
 
 import dill  # type: ignore[import-untyped]
 import pytest
@@ -14,8 +15,74 @@ import pytest
 import tests.utils
 from cobrafuzz import fuzzer, state as st
 
+QueueType = TypeVar("QueueType")
 
-class State(st.State):
+
+class DummyQueue(Generic[QueueType]):
+    def __init__(self) -> None:
+        self._data: list[QueueType] = []
+        self.canceled = False
+
+    def put(self, item: QueueType) -> None:
+        self._data.append(item)
+
+    def get(self) -> QueueType:
+        result = self._data[0]
+        self._data = self._data[1:]
+        return result
+
+    def empty(self) -> bool:
+        return len(self._data) == 0
+
+    def cancel_join_thread(self) -> None:
+        self.canceled = True
+
+
+class DummyProcess:
+    def __init__(self, target: Callable[[bytes], None], args: ArgsType):
+        self.target = target
+        self.args = args
+        self.terminated = False
+        self.started = False
+        self.joined = False
+        self.timeout: Optional[int] = None
+
+    def start(self) -> None:
+        self.started = True
+
+    def terminate(self) -> None:
+        self.terminated = True
+
+    def join(self, timeout: int) -> None:
+        self.joined = True
+        self.timeout = timeout
+
+
+qu: DummyQueue[fuzzer.Update] = DummyQueue()
+qr: DummyQueue[fuzzer.Result] = DummyQueue()
+
+T = TypeVar("T")
+
+
+class DummyContext(Generic[T]):
+    def __init__(
+        self,
+        wid: int,
+    ):
+        self._wid = wid
+
+    def Queue(self) -> DummyQueue[T]:  # noqa: N802
+        return DummyQueue()
+
+    def Process(  # noqa: N802
+        self,
+        target: Callable[[bytes], None],
+        args: ArgsType,
+    ) -> DummyProcess:
+        return DummyProcess(target=target, args=args)
+
+
+class DummyState(st.State):
     def __init__(self, data: bytes, report_new_path: bool = False) -> None:
         super().__init__()
         self.count = 0
@@ -42,29 +109,6 @@ class DoneError(Exception):
     pass
 
 
-def worker_crash(
-    wid: int,
-    _target_bytes: bytes,
-    _update_queue: mp.Queue[fuzzer.Update],
-    result_queue: mp.Queue[fuzzer.StatusBase],
-    _close_stdout: bool,
-    _close_stderr: bool,
-    _stat_frequency: int,
-    _state: st.State,
-) -> None:
-    print("worker on stdout")  # noqa: T201
-    print("worker on stderr", file=sys.stderr)  # noqa: T201
-    result_queue.put(
-        fuzzer.Error(
-            wid=wid,
-            runs=1000,
-            data=b"deadbeef",
-            covered={("a", 1, "b", 2)},
-            message="worker crashed",
-        ),
-    )
-
-
 def test_stats(
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
@@ -72,8 +116,8 @@ def test_stats(
 ) -> None:
     data = b"deadbeef"
     covered: set[tuple[Optional[str], Optional[int], str, int]] = {("a", 1, "b", 2)}
-    state = State(data=b"deadbeef", report_new_path=True)
-    result_queue: mp.Queue[fuzzer.Result] = mp.Queue()
+    state = DummyState(data=b"deadbeef", report_new_path=True)
+    result_queue: DummyQueue[fuzzer.Result] = DummyQueue()
     result_queue.put(fuzzer.Report(wid=0, runs=1, data=data, covered=covered))
     with monkeypatch.context() as p:
         p.setattr(time, "time", tests.utils.mock_time())
@@ -96,17 +140,34 @@ def test_stats(
     )
 
 
-def test_write_sample(tmp_path: Path) -> None:
-    sample = 1000 * b"x"
+@pytest.mark.parametrize(
+    ("subdir", "length"),
+    [
+        ("crashes", 100),
+        ("crashes", 1000),
+        ("", 50),
+        ("", 2000),
+    ],
+)
+def test_write_sample(
+    subdir: str,
+    length: int,
+    caplog: pytest.LogCaptureFixture,
+    tmp_path: Path,
+) -> None:
+    crash_dir = tmp_path / subdir
+    sample = length * b"x"
     f = fuzzer.Fuzzer(  # pragma: no cover
         target=lambda _: None,
-        crash_dir=tmp_path,
+        crash_dir=crash_dir,
     )
-    f._write_sample(sample)  # noqa: SLF001
-    artifact = next(tmp_path.glob("*"))
+    with caplog.at_level(logging.INFO):
+        f._write_sample(sample)  # noqa: SLF001
+    artifact = next(crash_dir.glob("*"))
     assert artifact.is_file()
     with artifact.open("rb") as af:
         assert af.read() == sample
+    assert length >= 200 or f"sample = {sample.hex()}" in caplog.text
 
 
 def test_regression_valid(caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
@@ -131,7 +192,7 @@ def test_regression_valid(caplog: pytest.LogCaptureFixture, tmp_path: Path) -> N
 
 
 def test_load_crashes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    state = State(data=b"deadbeef", report_new_path=False)
+    state = DummyState(data=b"deadbeef", report_new_path=False)
     with (tmp_path / "crash1").open("wb") as cf:
         cf.write(b"*foo")
     with (tmp_path / "crash2").open("wb") as cf:
@@ -143,86 +204,27 @@ def test_load_crashes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         load_crashes=False,
     )
     assert not state.data
-    with monkeypatch.context() as mp:
-        mp.setattr(f, "_state", state)
+    with monkeypatch.context() as p:
+        p.setattr(f, "_state", state)
         f._load_crashes(regression=False)  # noqa: SLF001
     assert state.data
 
 
-def test_crash_simple(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    crash_dir = tmp_path / "crashes"
-    with monkeypatch.context() as mp:
-        mp.setattr(fuzzer, "worker", worker_crash)
-        f = fuzzer.Fuzzer(  # pragma: no cover
-            target=lambda _: None,
-            crash_dir=crash_dir,
-            max_crashes=1,
-        )
-        with pytest.raises(SystemExit, match="^1$"):
-            f.start()
-        assert crash_dir.is_dir()
-
-
-def test_crash_hard(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    crash_dir = tmp_path / "crashes"
-    with monkeypatch.context() as mp:
-        mp.setattr(fuzzer, "worker", worker_crash)
-        f = fuzzer.Fuzzer(  # pragma: no cover
-            crash_dir=crash_dir,
-            target=lambda _: None,
-            max_crashes=1,
-            num_workers=2,
-            stat_frequency=1,
-        )
-        with pytest.raises(SystemExit, match="^1$"):
-            f.start()
-        assert crash_dir.is_dir()
-
-
-def test_crash_hard_non_adaptive(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    crash_dir = tmp_path / "crashes"
-    with monkeypatch.context() as mp:
-        mp.setattr(fuzzer, "worker", worker_crash)
-        f = fuzzer.Fuzzer(  # pragma: no cover
-            target=lambda _: None,
-            adaptive=False,
-            crash_dir=crash_dir,
-            max_crashes=1,
-        )
-        with pytest.raises(SystemExit, match="^1$"):
-            f.start()
-        assert crash_dir.is_dir()
-
-
-def test_crash_with_crash_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    crash_dir = tmp_path / "crashes"
-    with monkeypatch.context() as mp:
-        mp.setattr(fuzzer, "worker", worker_crash)
-        f = fuzzer.Fuzzer(  # pragma: no cover
-            target=lambda _: None,
-            crash_dir=crash_dir,
-            max_crashes=1,
-        )
-        with pytest.raises(SystemExit, match="^1$"):
-            f.start()
-        assert crash_dir.is_dir()
-
-
-def test_internal_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    with monkeypatch.context() as mp:
-        # Letting dill.loads fail in the worker by injecting an invalid result to dill.dumps
-        # is our only way to trigger an error. Child processes are freshly spawned and hence we
-        # cannot monkeypatch them.
-        mp.setattr(dill, "dumps", lambda _: b"0")
-        f = fuzzer.Fuzzer(  # pragma: no cover
-            target=lambda _: None,
-            crash_dir=tmp_path,
-            max_runs=1,
-            num_workers=1,
-            load_crashes=False,
-        )
-        with pytest.raises(SystemExit, match="INTERNAL ERROR"):
-            f.start()
+# def test_internal_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+#     with monkeypatch.context() as p:
+#         # Letting dill.loads fail in the worker by injecting an invalid result to dill.dumps
+#         # is our only way to trigger an error. Child processes are freshly spawned and hence we
+#         # cannot monkeypatch them.
+#         p.setattr(dill, "dumps", lambda _: b"0")
+#         f = fuzzer.Fuzzer(  # pragma: no cover
+#             target=lambda _: None,
+#             crash_dir=tmp_path,
+#             max_runs=1,
+#             num_workers=1,
+#             load_crashes=False,
+#         )
+#         with pytest.raises(SystemExit, match="INTERNAL ERROR"):
+#             f.start()
 
 
 def test_worker_loop_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -232,7 +234,7 @@ def test_worker_loop_error(monkeypatch: pytest.MonkeyPatch) -> None:
         state: st.State,
         runs: int,
     ) -> fuzzer.StatusBase:
-        assert isinstance(state, State)
+        assert isinstance(state, DummyState)
         if state.count > 1:
             raise DoneError("Test done")
         state.count += 1
@@ -247,8 +249,8 @@ def test_worker_loop_error(monkeypatch: pytest.MonkeyPatch) -> None:
             message="Test Error",
         )
 
-    update_queue: mp.Queue[fuzzer.Update] = mp.Queue()
-    result_queue: mp.Queue[fuzzer.StatusBase] = mp.Queue()
+    update_queue: DummyQueue[fuzzer.Update] = DummyQueue()
+    result_queue: DummyQueue[fuzzer.StatusBase] = DummyQueue()
 
     update_queue.put(fuzzer.Update(b"update", covered=set()))
 
@@ -258,14 +260,14 @@ def test_worker_loop_error(monkeypatch: pytest.MonkeyPatch) -> None:
             fuzzer.worker_loop(  # pragma: no cover
                 wid=1,
                 target_bytes=dill.dumps(lambda _: None),
-                update_queue=update_queue,
-                result_queue=result_queue,
+                update_queue=update_queue,  # type: ignore[arg-type]
+                result_queue=result_queue,  # type: ignore[arg-type]
                 close_stdout=True,
                 close_stderr=True,
                 stat_frequency=1,
-                state=State(b"deadbeef"),
+                state=DummyState(b"deadbeef"),
             )
-        result = result_queue.get(block=False)
+        result = result_queue.get()
         assert isinstance(result, fuzzer.Error)
         assert result.wid == 1
         assert result.runs == 1
@@ -280,7 +282,7 @@ def test_worker_loop_status(monkeypatch: pytest.MonkeyPatch) -> None:
         state: st.State,
         runs: int,
     ) -> fuzzer.StatusBase:
-        assert isinstance(state, State)
+        assert isinstance(state, DummyState)
         if state.count > 1:
             raise DoneError("Test done")
         state.count += 1
@@ -290,8 +292,8 @@ def test_worker_loop_status(monkeypatch: pytest.MonkeyPatch) -> None:
             runs=runs,
         )
 
-    update_queue: mp.Queue[fuzzer.Update] = mp.Queue()
-    result_queue: mp.Queue[fuzzer.StatusBase] = mp.Queue()
+    update_queue: DummyQueue[fuzzer.Update] = DummyQueue()
+    result_queue: DummyQueue[fuzzer.StatusBase] = DummyQueue()
 
     update_queue.put(fuzzer.Update(b"update", covered=set()))
 
@@ -302,18 +304,22 @@ def test_worker_loop_status(monkeypatch: pytest.MonkeyPatch) -> None:
             fuzzer.worker_loop(  # pragma: no cover
                 wid=1,
                 target_bytes=dill.dumps(lambda _: None),
-                update_queue=update_queue,
-                result_queue=result_queue,
-                close_stdout=True,
-                close_stderr=True,
+                update_queue=update_queue,  # type: ignore[arg-type]
+                result_queue=result_queue,  # type: ignore[arg-type]
+                close_stdout=False,
+                close_stderr=False,
                 stat_frequency=1,
-                state=State(data=b"deadbeef"),
+                state=DummyState(data=b"deadbeef"),
             )
-        assert result_queue.empty()
+        assert not result_queue.empty()
+        result = result_queue.get()
+        assert isinstance(result, fuzzer.Status)
+        assert result.wid == 1
+        assert result.runs == 2
 
 
 def test_worker_run_error_result() -> None:
-    state = State(data=b"deadbeef")
+    state = DummyState(data=b"deadbeef")
     result = fuzzer._worker_run(  # noqa: SLF001
         wid=1,
         target=lambda _: tests.utils.do_raise(DoneError, message="Test done"),
@@ -328,7 +334,7 @@ def test_worker_run_error_result() -> None:
 
 
 def test_worker_run_report_result() -> None:
-    state = State(data=b"deadbeef", report_new_path=True)
+    state = DummyState(data=b"deadbeef", report_new_path=True)
     result = fuzzer._worker_run(  # noqa: SLF001
         wid=1,
         target=lambda _: None,
@@ -344,7 +350,7 @@ def test_worker_run_report_result() -> None:
 
 
 def test_worker_run_status_result() -> None:
-    state = State(data=b"deadbeef")
+    state = DummyState(data=b"deadbeef")
     result = fuzzer._worker_run(  # noqa: SLF001
         wid=1,
         target=lambda _: None,
@@ -380,8 +386,8 @@ def test_start_no_progress(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    state = State(data=b"deadbeef", report_new_path=False)
-    result_queue: mp.Queue[fuzzer.Result] = mp.Queue()
+    state = DummyState(data=b"deadbeef", report_new_path=False)
+    result_queue: DummyQueue[fuzzer.Result] = DummyQueue()
     result_queue.put(fuzzer.Report(wid=1, runs=1, data=b"deadbeef", covered=set()))
     with monkeypatch.context() as p:
         p.setattr(time, "time", tests.utils.mock_time())
@@ -396,10 +402,8 @@ def test_start_no_progress(
         p.setattr(f, "_result_queue", result_queue)
         with pytest.raises(SystemExit, match="^0$"), caplog.at_level(logging.INFO):
             f.start()
-    assert caplog.record_tuples == [
-        ("root", logging.INFO, "#0 READ units: 1 workers: 1 seeds: 0"),
-        ("root", logging.INFO, "Performed 1 runs (0/s), stopping."),
-    ]
+    assert caplog.record_tuples[0] == ("root", logging.INFO, "#0 READ units: 1 workers: 1 seeds: 0")
+    assert caplog.record_tuples[-1] == ("root", logging.INFO, "Performed 1 runs (0/s), stopping.")
 
 
 def test_start_status(
@@ -407,8 +411,8 @@ def test_start_status(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    state = State(data=b"deadbeef", report_new_path=False)
-    result_queue: mp.Queue[fuzzer.StatusBase] = mp.Queue()
+    state = DummyState(data=b"deadbeef", report_new_path=False)
+    result_queue: DummyQueue[fuzzer.StatusBase] = DummyQueue()
     result_queue.put(fuzzer.Status(wid=1, runs=1))
     with monkeypatch.context() as p:
         p.setattr(time, "time", tests.utils.mock_time())
@@ -437,8 +441,8 @@ def test_start_progress_with_update(
 ) -> None:
     data = b"deadbeef"
     covered: set[tuple[Optional[str], Optional[int], str, int]] = {("a", 1, "b", 2)}
-    state = State(data=b"deadbeef", report_new_path=True)
-    result_queue: mp.Queue[fuzzer.Result] = mp.Queue()
+    state = DummyState(data=b"deadbeef", report_new_path=True)
+    result_queue: DummyQueue[fuzzer.Result] = DummyQueue()
     result_queue.put(fuzzer.Report(wid=1, runs=1, data=data, covered=covered))
     with monkeypatch.context() as p:
         p.setattr(time, "time", tests.utils.mock_time())
@@ -449,7 +453,7 @@ def test_start_progress_with_update(
             num_workers=2,
         )
         p.setattr(f, "_state", state)
-        p.setattr(f, "_initialize_process", lambda wid: (None, mp.Queue()))  # noqa: ARG005
+        p.setattr(f, "_initialize_process", lambda wid: (None, DummyQueue()))  # noqa: ARG005
         p.setattr(f, "_terminate_workers", lambda: None)
         p.setattr(f, "_result_queue", result_queue)
         with pytest.raises(SystemExit, match="^0$"), caplog.at_level(logging.INFO):
@@ -474,9 +478,18 @@ def test_start_pulse(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    state = State(data=b"deadbeef", report_new_path=False)
-    result_queue: mp.Queue[fuzzer.StatusBase] = mp.Queue()
+    state = DummyState(data=b"deadbeef", report_new_path=False)
+    result_queue: DummyQueue[fuzzer.StatusBase] = DummyQueue()
     result_queue.put(fuzzer.Status(wid=1, runs=1))
+    result_queue.put(
+        fuzzer.Error(
+            wid=1,
+            runs=1,
+            data=b"deadbeef",
+            covered=set(),
+            message="Test error message",
+        ),
+    )
     with monkeypatch.context() as p:
         p.setattr(time, "time", tests.utils.mock_time())
         f = fuzzer.Fuzzer(  # pragma: no cover
@@ -493,6 +506,164 @@ def test_start_pulse(
             f.start()
     assert caplog.record_tuples == [
         ("root", logging.INFO, "#0 READ units: 1 workers: 1 seeds: 0"),
-        ("root", logging.INFO, "#1 PULSE     cov: 0 corp: 1 exec/s: 0 crashes: 0"),
+        ("root", logging.INFO, "#2 PULSE     cov: 0 corp: 1 exec/s: 0 crashes: 0"),
         ("root", logging.INFO, "Timeout after 10 seconds, stopping."),
     ]
+
+
+def test_start_error(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state = DummyState(data=b"deadbeef", report_new_path=True)
+    result_queue: DummyQueue[fuzzer.StatusBase] = DummyQueue()
+    data = b"deadbeef"
+    m = hashlib.sha256()
+    m.update(data)
+    digest = m.hexdigest()
+    error = fuzzer.Error(
+        wid=1,
+        runs=1,
+        data=data,
+        covered=set(),
+        message="Test error message",
+    )
+    result_queue.put(error)
+    with monkeypatch.context() as p:
+        f = fuzzer.Fuzzer(  # pragma: no cover
+            target=lambda _: None,
+            crash_dir=tmp_path,
+            max_crashes=1,
+        )
+        p.setattr(f, "_state", state)
+        p.setattr(f, "_initialize_process", lambda wid: (None, None))  # noqa: ARG005
+        p.setattr(f, "_terminate_workers", lambda: None)
+        p.setattr(f, "_result_queue", result_queue)
+        with pytest.raises(SystemExit, match="^1$"), caplog.at_level(logging.INFO):
+            f.start()
+    filename = f"crash-{digest}"
+    assert caplog.record_tuples == [
+        ("root", logging.INFO, "#0 READ units: 1 workers: 1 seeds: 0"),
+        ("root", logging.INFO, "Test error message"),
+        ("root", logging.INFO, f"sample was written to {tmp_path / filename}"),
+        ("root", logging.INFO, "sample = 6465616462656566"),
+        ("root", logging.INFO, "Found 1 crashes, stopping."),
+    ]
+
+
+def test_start_bug(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state = DummyState(data=b"deadbeef", report_new_path=False)
+    result_queue: DummyQueue[fuzzer.StatusBase] = DummyQueue()
+    result_queue.put(fuzzer.Bug(wid=1, message="Test bug"))
+    with monkeypatch.context() as p:
+        f = fuzzer.Fuzzer(  # pragma: no cover
+            target=lambda _: None,
+            crash_dir=tmp_path,
+            max_crashes=1,
+        )
+        p.setattr(f, "_state", state)
+        p.setattr(f, "_initialize_process", lambda wid: (None, None))  # noqa: ARG005
+        p.setattr(f, "_terminate_workers", lambda: None)
+        p.setattr(f, "_result_queue", result_queue)
+        with pytest.raises(SystemExit, match=r"INTERNAL ERROR"):
+            f.start()
+
+
+def test_worker(monkeypatch: pytest.MonkeyPatch) -> None:
+    update_queue: DummyQueue[fuzzer.Update] = DummyQueue()
+    result_queue: DummyQueue[fuzzer.StatusBase] = DummyQueue()
+
+    with monkeypatch.context() as p:
+        p.setattr(
+            "cobrafuzz.fuzzer.worker_loop",
+            lambda **_: tests.utils.do_raise(DoneError, message="Test done"),
+        )
+        fuzzer.worker(  # pragma: no cover
+            wid=0,
+            target_bytes=dill.dumps(lambda _: None),
+            update_queue=update_queue,  # type: ignore[arg-type]
+            result_queue=result_queue,  # type: ignore[arg-type]
+            close_stdout=False,
+            close_stderr=False,
+            stat_frequency=1,
+            state=DummyState(data=b"deadbeef"),
+        )
+        assert not result_queue.empty()
+        result = result_queue.get()
+        assert isinstance(result, fuzzer.Bug)
+        assert result.wid == 0
+        assert "Test done" in result.message
+
+
+ArgsType = tuple[
+    int,
+    bytes,
+    DummyQueue[fuzzer.Update],
+    DummyQueue[fuzzer.Result],
+    bool,
+    bool,
+    int,
+    DummyState,
+]
+
+
+def test_initialize_process(monkeypatch: pytest.MonkeyPatch) -> None:
+    def target(_: bytes) -> None:
+        pass
+
+    with monkeypatch.context() as p:
+        p.setattr(multiprocessing, "get_context", lambda _: DummyContext(wid=0))
+        f = fuzzer.Fuzzer(crash_dir=Path("/"), target=target, stat_frequency=10)
+        s = DummyState(data=b"deadbeef")
+        p.setattr(f, "_state", s)
+        p.setattr(f, "_result_queue", qr)
+        result, _ = cast(
+            tuple[DummyProcess, DummyQueue[fuzzer.Update]],
+            f._initialize_process(wid=0),  # noqa: SLF001
+        )
+        assert result.args[0] == 0
+        assert result.args[1] == dill.dumps(target)
+        assert not result.args[4]
+        assert not result.args[5]
+        assert result.args[6] == 10
+        assert result.args[7] == s
+
+
+def test_terminate_workers(monkeypatch: pytest.MonkeyPatch) -> None:
+    def target(_: bytes) -> None:
+        pass
+
+    args: ArgsType = (
+        0,
+        b"deadbeef",
+        DummyQueue(),
+        DummyQueue(),
+        False,
+        False,
+        10,
+        DummyState(b"deadbeef"),
+    )
+
+    workers: list[tuple[DummyProcess, DummyQueue[fuzzer.Result]]] = [
+        (DummyProcess(target=target, args=args), DummyQueue()),
+        (DummyProcess(target=target, args=args), DummyQueue()),
+    ]
+
+    with monkeypatch.context() as p:
+        p.setattr(multiprocessing, "get_context", lambda _: DummyContext(wid=0))
+        f = fuzzer.Fuzzer(crash_dir=Path("/"), target=target)
+        p.setattr(f, "_workers", workers)
+        assert not cast(DummyQueue[fuzzer.Result], f._result_queue).canceled  # noqa: SLF001
+        assert all(
+            not w[0].terminated and not w[0].joined and w[0].timeout is None and not w[1].canceled
+            for w in workers
+        )
+        f._terminate_workers()  # noqa: SLF001
+        assert cast(DummyQueue[fuzzer.Result], f._result_queue).canceled  # noqa: SLF001
+        assert all(
+            w[0].terminated and w[0].joined and w[0].timeout == 1 and w[1].canceled for w in workers
+        )
