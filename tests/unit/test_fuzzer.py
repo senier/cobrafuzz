@@ -7,7 +7,7 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Callable, Generic, Optional, TypeVar, cast
+from typing import Callable, Generic, Optional, Tuple, TypeVar, cast
 
 import dill  # type: ignore[import-untyped]
 import pytest
@@ -599,7 +599,7 @@ def test_worker(monkeypatch: pytest.MonkeyPatch) -> None:
         assert "Test done" in result.message
 
 
-ArgsType = tuple[
+ArgsType = Tuple[
     int,
     bytes,
     DummyQueue[fuzzer.Update],
@@ -613,7 +613,7 @@ ArgsType = tuple[
 
 def test_initialize_process(monkeypatch: pytest.MonkeyPatch) -> None:
     def target(_: bytes) -> None:
-        pass
+        pass  # pragma: no cover
 
     with monkeypatch.context() as p:
         p.setattr(multiprocessing, "get_context", lambda _: DummyContext(wid=0))
@@ -635,7 +635,7 @@ def test_initialize_process(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_terminate_workers(monkeypatch: pytest.MonkeyPatch) -> None:
     def target(_: bytes) -> None:
-        pass
+        pass  # pragma: no cover
 
     args: ArgsType = (
         0,
