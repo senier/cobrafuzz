@@ -10,10 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Catch and report internal worker errors
+- Implement adaptive random fuzzing parameter selection (#24)
 
 ### Fixed
 
 - Missing --state-file parameter (#15)
+- Keyboard interrupts are handled gracefully now
+
+### Changed
+
+- Report full exception backtrace when error was found
 
 ## [2.1.1] - 2024-02-12
 
