@@ -21,7 +21,11 @@ class Params:
             rand.update(success=success)
 
 
-def _mutate_remove_range_of_bytes(res: bytearray, rand: Params) -> None:
+def _mutate_remove_range_of_bytes(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     if len(res) < 2:
         raise common.OutOfDataError
     assert isinstance(rand.length, util.AdaptiveRange)
@@ -30,7 +34,11 @@ def _mutate_remove_range_of_bytes(res: bytearray, rand: Params) -> None:
     util.remove(data=res, start=rand.start.sample(0, len(res) - length), length=length)
 
 
-def _mutate_insert_range_of_bytes(res: bytearray, rand: Params) -> None:
+def _mutate_insert_range_of_bytes(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     assert isinstance(rand.length, util.AdaptiveRange)
     assert isinstance(rand.start, util.AdaptiveRange)
     assert isinstance(rand.data, util.AdaptiveRange)
@@ -39,7 +47,11 @@ def _mutate_insert_range_of_bytes(res: bytearray, rand: Params) -> None:
     util.insert(data=res, start=rand.start.sample(0, len(res)), data_to_insert=data)
 
 
-def _mutate_duplicate_range_of_bytes(res: bytearray, rand: Params) -> None:
+def _mutate_duplicate_range_of_bytes(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     if len(res) < 2:
         raise common.OutOfDataError
     assert isinstance(rand.src_pos, util.AdaptiveRange)
@@ -51,7 +63,11 @@ def _mutate_duplicate_range_of_bytes(res: bytearray, rand: Params) -> None:
     util.insert(res, dst_pos, res[src_pos : src_pos + length])
 
 
-def _mutate_copy_range_of_bytes(res: bytearray, rand: Params) -> None:
+def _mutate_copy_range_of_bytes(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     if len(res) < 2:
         raise common.OutOfDataError
     assert isinstance(rand.src_pos, util.AdaptiveRange)
@@ -63,7 +79,11 @@ def _mutate_copy_range_of_bytes(res: bytearray, rand: Params) -> None:
     util.copy(res, src_pos, dst_pos, length)
 
 
-def _mutate_bit_flip(res: bytearray, rand: Params) -> None:
+def _mutate_bit_flip(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     if len(res) < 1:
         raise common.OutOfDataError
     assert isinstance(rand.byte_pos, util.AdaptiveRange)
@@ -73,7 +93,11 @@ def _mutate_bit_flip(res: bytearray, rand: Params) -> None:
     res[byte_pos] ^= 1 << bit_pos
 
 
-def _mutate_flip_random_bits_of_random_byte(res: bytearray, rand: Params) -> None:
+def _mutate_flip_random_bits_of_random_byte(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     if len(res) < 1:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
@@ -82,7 +106,11 @@ def _mutate_flip_random_bits_of_random_byte(res: bytearray, rand: Params) -> Non
     res[pos] ^= rand.value.sample(0, 255)
 
 
-def _mutate_swap_two_bytes(res: bytearray, rand: Params) -> None:
+def _mutate_swap_two_bytes(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     if len(res) < 2:
         raise common.OutOfDataError
     assert isinstance(rand.first_pos, util.AdaptiveRange)
@@ -92,7 +120,11 @@ def _mutate_swap_two_bytes(res: bytearray, rand: Params) -> None:
     res[first_pos], res[second_pos] = res[second_pos], res[first_pos]
 
 
-def _mutate_add_subtract_from_a_byte(res: bytearray, rand: Params) -> None:
+def _mutate_add_subtract_from_a_byte(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     if len(res) < 1:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
@@ -102,7 +134,11 @@ def _mutate_add_subtract_from_a_byte(res: bytearray, rand: Params) -> None:
     res[pos] = (res[pos] + v_int) % 256
 
 
-def _mutate_add_subtract_from_a_uint16(res: bytearray, rand: Params) -> None:
+def _mutate_add_subtract_from_a_uint16(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     if len(res) < 2:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
@@ -116,7 +152,11 @@ def _mutate_add_subtract_from_a_uint16(res: bytearray, rand: Params) -> None:
     res[pos + 1] = (res[pos + 1] + v[1]) % 256
 
 
-def _mutate_add_subtract_from_a_uint32(res: bytearray, rand: Params) -> None:
+def _mutate_add_subtract_from_a_uint32(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     if len(res) < 4:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
@@ -131,7 +171,11 @@ def _mutate_add_subtract_from_a_uint32(res: bytearray, rand: Params) -> None:
     res[pos + 3] = (res[pos + 3] + v[3]) % 256
 
 
-def _mutate_add_subtract_from_a_uint64(res: bytearray, rand: Params) -> None:
+def _mutate_add_subtract_from_a_uint64(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     if len(res) < 8:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
@@ -150,7 +194,11 @@ def _mutate_add_subtract_from_a_uint64(res: bytearray, rand: Params) -> None:
     res[pos + 7] = (res[pos + 7] + v[7]) % 256
 
 
-def _mutate_replace_a_byte_with_an_interesting_value(res: bytearray, rand: Params) -> None:
+def _mutate_replace_a_byte_with_an_interesting_value(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     if len(res) < 1:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
@@ -159,7 +207,11 @@ def _mutate_replace_a_byte_with_an_interesting_value(res: bytearray, rand: Param
     res[pos] = rand.interesting_8.sample()
 
 
-def _mutate_replace_an_uint16_with_an_interesting_value(res: bytearray, rand: Params) -> None:
+def _mutate_replace_an_uint16_with_an_interesting_value(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     if len(res) < 2:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
@@ -172,7 +224,11 @@ def _mutate_replace_an_uint16_with_an_interesting_value(res: bytearray, rand: Pa
     res[pos + 1] = v[1] % 256
 
 
-def _mutate_replace_an_uint32_with_an_interesting_value(res: bytearray, rand: Params) -> None:
+def _mutate_replace_an_uint32_with_an_interesting_value(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     if len(res) < 4:
         raise common.OutOfDataError
     assert isinstance(rand.pos, util.AdaptiveRange)
@@ -187,7 +243,11 @@ def _mutate_replace_an_uint32_with_an_interesting_value(res: bytearray, rand: Pa
     res[pos + 3] = v[3] % 256
 
 
-def _mutate_replace_an_ascii_digit_with_another_digit(res: bytearray, rand: Params) -> None:
+def _mutate_replace_an_ascii_digit_with_another_digit(
+    res: bytearray,
+    rand: Params,
+    _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
     digits_present = [i for i in range(len(res)) if ord("0") <= res[i] <= ord("9")]
     if len(digits_present) < 1:
         raise common.OutOfDataError
@@ -195,6 +255,24 @@ def _mutate_replace_an_ascii_digit_with_another_digit(res: bytearray, rand: Para
     assert isinstance(rand.digits, util.AdaptiveChoiceBase)
     pos = rand.pos.sample(0, len(res) - 1)
     res[pos] = rand.digits.sample()
+
+
+def _mutate_splice(
+    res: bytearray,
+    rand: Params,
+    inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
+) -> None:
+    if len(res) < 1:
+        raise common.OutOfDataError
+    assert inputs is not None
+    right = inputs.sample()
+    if len(right) < 1:
+        raise common.OutOfDataError
+    assert isinstance(rand.left_pos, util.AdaptiveRange)
+    assert isinstance(rand.right_pos, util.AdaptiveRange)
+    res[rand.left_pos.sample(0, len(res) - 1) + 1 :] = right[
+        rand.right_pos.sample(0, len(right) - 1) :
+    ]
 
 
 class Mutator:
@@ -210,7 +288,7 @@ class Mutator:
         self._max_modifications = max_modifications
         self._modifications = util.AdaptiveRange(adaptive=adaptive)
         self._mutators: util.AdaptiveChoiceBase[
-            tuple[Callable[[bytearray, Params], None], Params]
+            tuple[Callable[[bytearray, Params, util.AdaptiveChoiceBase[bytearray]], None], Params]
         ] = util.AdaptiveChoiceBase(
             population=[
                 (
@@ -350,6 +428,13 @@ class Mutator:
                         ),
                     ),
                 ),
+                (
+                    _mutate_splice,
+                    Params(
+                        left_pos=util.AdaptiveRange(adaptive=adaptive),
+                        right_pos=util.AdaptiveRange(adaptive=adaptive),
+                    ),
+                ),
             ],
         )
         self._last_rands: Optional[Params] = None
@@ -360,7 +445,7 @@ class Mutator:
         while nm:
             modify, self._last_rands = self._mutators.sample()
             try:
-                modify(res, self._last_rands)
+                modify(res, self._last_rands, self._inputs)
             except common.OutOfDataError:
                 pass
             else:

@@ -37,7 +37,7 @@ class StaticIntChoice(util.AdaptiveChoiceBase[int]):
 
 
 def test_mutate(monkeypatch: pytest.MonkeyPatch) -> None:
-    def modify(data: bytearray, _: mutator.Params) -> None:
+    def modify(data: bytearray, _m: mutator.Params, _i: util.AdaptiveChoiceBase[bytearray]) -> None:
         data.insert(0, ord("a"))
         data.append(ord("b"))
 
@@ -51,7 +51,7 @@ def test_mutate(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
     m = mutator.Mutator()
 
-    def modify(data: bytearray, _: mutator.Params) -> None:
+    def modify(data: bytearray, _m: mutator.Params, _i: util.AdaptiveChoiceBase[bytearray]) -> None:
         if data[0] != 0:
             data[0] = 0
 
@@ -64,7 +64,11 @@ def test_mutate_unmodified(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_mutate_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
     m = mutator.Mutator(max_input_size=4)
     with monkeypatch.context() as mp:
-        mp.setattr(m, "_mutators", util.AdaptiveChoiceBase([(lambda _data, _: None, None)]))
+        mp.setattr(
+            m,
+            "_mutators",
+            util.AdaptiveChoiceBase([(lambda _data, _m, _i: (None, None, None), None)]),
+        )
         assert m._mutate(bytearray(b"0123456789")) == bytearray(b"0123")
 
 
@@ -611,6 +615,50 @@ def test_mutate_replace_an_ascii_digit_with_another_digit_success(
     assert tmp == expected
 
 
+def test_mutate_splice_fail_left() -> None:
+    res = bytearray()
+    with pytest.raises(common.OutOfDataError):
+        mutator._mutate_splice(res, mutator.Params())
+
+
+def test_mutate_splice_fail_right() -> None:
+    res = bytearray(b"deadbeef")
+    with pytest.raises(common.OutOfDataError):
+        mutator._mutate_splice(
+            res,
+            mutator.Params(),
+            util.AdaptiveChoiceBase(population=[bytearray()]),
+        )
+
+
+@pytest.mark.parametrize(
+    ("left", "left_pos", "right", "right_pos", "expected"),
+    [
+        (b"0123456789", 9, b"ABCDEFGHIJ", 0, b"0123456789ABCDEFGHIJ"),
+        (b"0123456789", 5, b"ABCDEFGHIJ", 5, b"012345FGHIJ"),
+        (b"0123456789", 0, b"ABCDEFGHIJ", 9, b"0J"),
+    ],
+)
+def test_mutate_splice(
+    left: bytes,
+    left_pos: int,
+    right: bytes,
+    right_pos: int,
+    expected: bytes,
+) -> None:
+    tmp = bytearray(left)
+
+    mutator._mutate_splice(
+        tmp,
+        mutator.Params(
+            left_pos=StaticRand(left_pos),
+            right_pos=StaticRand(right_pos),
+        ),
+        util.AdaptiveChoiceBase(population=[bytearray(right)]),
+    )
+    assert tmp == bytearray(expected)
+
+
 def test_params_invalid() -> None:
     p = mutator.Params()
     with pytest.raises(AttributeError, match="^'Params' object has no attribute '_invalid'$"):
@@ -637,7 +685,11 @@ def test_params_update() -> None:
 def test_mutator_detect_out_of_data_error(monkeypatch: pytest.MonkeyPatch) -> None:
     fail = True
 
-    def raise_out_of_data(_res: bytearray, _params: mutator.Params) -> None:
+    def raise_out_of_data(
+        _res: bytearray,
+        _params: mutator.Params,
+        _i: util.AdaptiveChoiceBase[bytearray],
+    ) -> None:
         nonlocal fail
         if fail:
             fail = False
@@ -657,7 +709,11 @@ def test_mutator_detect_out_of_data_error(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_mutator_update(monkeypatch: pytest.MonkeyPatch) -> None:
-    def mutate_noop(_res: bytearray, _params: mutator.Params) -> None:
+    def mutate_noop(
+        _res: bytearray,
+        _params: mutator.Params,
+        _i: util.AdaptiveChoiceBase[bytearray],
+    ) -> None:
         pass
 
     with monkeypatch.context() as mp:
