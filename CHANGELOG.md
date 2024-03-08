@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Catch and report internal worker errors
 - Implement adaptive random fuzzing parameter selection (#24)
+- Splicing mutation (#23)
 
 ### Fixed
 
