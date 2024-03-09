@@ -15,7 +15,6 @@ import dill as pickle  # type: ignore[import-untyped]
 
 from cobrafuzz import state as st, tracer
 
-logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 logging.getLogger().setLevel(logging.DEBUG)
 
 MPContext = Union[mp.context.ForkContext, mp.context.ForkServerContext, mp.context.SpawnContext]
@@ -112,7 +111,7 @@ def worker_loop(  # noqa: PLR0913
     state: st.State,
 ) -> None:
     class NullFile(io.StringIO):
-        """No-op to trash stdout away."""
+        """IO implementation that discards all writes."""
 
         def write(self, arg: str) -> int:
             return len(arg)
@@ -151,9 +150,9 @@ def worker_loop(  # noqa: PLR0913
         if type(result) == Status and time.time() - last_status <= stat_frequency:
             continue
 
-        runs = 0
         last_status = time.time()
         result_queue.put(result)
+        runs = 0
 
 
 def _worker_run(
@@ -243,8 +242,9 @@ class Fuzzer:
 
         self._current_crashes = 0
         self._current_runs = 0
-        self._last_runs = 0
+        self._start_time = time.time()
         self._last_stats_time = time.time()
+        self._last_crash: Optional[float] = None
 
         self._mp_ctx: MPContext = (
             mp.get_context("fork")
@@ -318,21 +318,24 @@ class Fuzzer:
 
     def _log_stats(self, log_type: str, total_coverage: int, corpus_size: int) -> None:
         end_time = time.time()
-        execs_per_second = int(
-            (self._current_runs - self._last_runs) / (end_time - self._last_stats_time),
-        )
+        execs_per_second = self._current_runs // (end_time - self._start_time)
 
         self._last_stats_time = end_time
         self._last_runs = self._current_runs
 
         logging.info(
-            "#%d %s     cov: %d corp: %d exec/s: %d crashes: %d",
+            "#%9.9d %s cov: %d, corp: %d, exec/s: %d, crashes: %d%s",
             self._current_runs,
             log_type,
             total_coverage,
             corpus_size,
             execs_per_second,
             self._current_crashes,
+            (
+                f", last: {int(end_time - self._last_crash) // 60} mins ago"
+                if self._last_crash
+                else ""
+            ),
         )
 
     def _write_sample(self, buf: bytes, prefix: str = "crash-") -> None:
@@ -382,7 +385,7 @@ class Fuzzer:
         self._workers = [self._initialize_process(wid=wid) for wid in range(self._num_workers)]
 
         logging.info(
-            "#0 READ units: %d workers: %d seeds: %d",
+            "START units: %d, workers: %d, seeds: %d",
             self._state.size,
             self._num_workers,
             self._state.num_seeds,
@@ -431,12 +434,13 @@ class Fuzzer:
                     if improvement:
                         logging.info(result.message)
                         self._current_crashes += 1
+                        self._last_crash = time.time()
                         self._write_sample(result.data)
 
                 elif isinstance(result, Report):
                     improvement = self._state.store_coverage(result.covered)
                     if improvement:
-                        self._log_stats("NEW", self._state.total_coverage, self._state.size)
+                        self._log_stats("  NEW", self._state.total_coverage, self._state.size)
                         self._state.put_input(bytearray(result.data))
                         self._state.save()
 

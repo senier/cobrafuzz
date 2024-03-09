@@ -134,7 +134,7 @@ def test_stats(
             f.start()
         f._log_stats("CUSTOM", total_coverage=123, corpus_size=5)  # noqa: SLF001
     assert re.match(
-        r".*CUSTOM\s+cov: 123 corp: 5 exec/s: \d+ crashes: 0\n.*",
+        r".*CUSTOM\s+cov: 123, corp: 5, exec/s: \d+, crashes: 0\n.*",
         caplog.text,
         flags=re.DOTALL,
     )
@@ -376,7 +376,7 @@ def test_timeout(
         with pytest.raises(SystemExit, match="^0$"), caplog.at_level(logging.INFO):
             f.start()
     assert caplog.record_tuples == [
-        ("root", logging.INFO, "#0 READ units: 1 workers: 1 seeds: 0"),
+        ("root", logging.INFO, "START units: 1, workers: 1, seeds: 0"),
         ("root", logging.INFO, "Timeout after 10 seconds, stopping."),
     ]
 
@@ -402,7 +402,7 @@ def test_start_no_progress(
         p.setattr(f, "_result_queue", result_queue)
         with pytest.raises(SystemExit, match="^0$"), caplog.at_level(logging.INFO):
             f.start()
-    assert caplog.record_tuples[0] == ("root", logging.INFO, "#0 READ units: 1 workers: 1 seeds: 0")
+    assert caplog.record_tuples[0] == ("root", logging.INFO, "START units: 1, workers: 1, seeds: 0")
     assert caplog.record_tuples[-1] == ("root", logging.INFO, "Performed 1 runs (0/s), stopping.")
 
 
@@ -429,7 +429,7 @@ def test_start_status(
         with pytest.raises(SystemExit, match="^0$"), caplog.at_level(logging.INFO):
             f.start()
     assert caplog.record_tuples == [
-        ("root", logging.INFO, "#0 READ units: 1 workers: 2 seeds: 0"),
+        ("root", logging.INFO, "START units: 1, workers: 2, seeds: 0"),
         ("root", logging.INFO, "Performed 1 runs (0/s), stopping."),
     ]
 
@@ -467,8 +467,8 @@ def test_start_progress_with_update(
         assert update.covered == covered
 
     assert caplog.record_tuples == [
-        ("root", logging.INFO, "#0 READ units: 1 workers: 2 seeds: 0"),
-        ("root", logging.INFO, "#1 NEW     cov: 0 corp: 1 exec/s: 0 crashes: 0"),
+        ("root", logging.INFO, "START units: 1, workers: 2, seeds: 0"),
+        ("root", logging.INFO, "#000000001   NEW cov: 0, corp: 1, exec/s: 0, crashes: 0"),
         ("root", logging.INFO, "Performed 1 runs (0/s), stopping."),
     ]
 
@@ -505,8 +505,8 @@ def test_start_pulse(
         with pytest.raises(SystemExit, match="^0$"), caplog.at_level(logging.INFO):
             f.start()
     assert caplog.record_tuples == [
-        ("root", logging.INFO, "#0 READ units: 1 workers: 1 seeds: 0"),
-        ("root", logging.INFO, "#2 PULSE     cov: 0 corp: 1 exec/s: 0 crashes: 0"),
+        ("root", logging.INFO, "START units: 1, workers: 1, seeds: 0"),
+        ("root", logging.INFO, "#000000002 PULSE cov: 0, corp: 1, exec/s: 0, crashes: 0"),
         ("root", logging.INFO, "Timeout after 10 seconds, stopping."),
     ]
 
@@ -544,7 +544,7 @@ def test_start_error(
             f.start()
     filename = f"crash-{digest}"
     assert caplog.record_tuples == [
-        ("root", logging.INFO, "#0 READ units: 1 workers: 1 seeds: 0"),
+        ("root", logging.INFO, "START units: 1, workers: 1, seeds: 0"),
         ("root", logging.INFO, "Test error message"),
         ("root", logging.INFO, f"sample was written to {tmp_path / filename}"),
         ("root", logging.INFO, "sample = 6465616462656566"),
