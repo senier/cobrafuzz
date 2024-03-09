@@ -1,4 +1,5 @@
 import argparse
+import logging
 import sys
 from pathlib import Path
 from typing import Callable
@@ -98,6 +99,7 @@ class CobraFuzz:
             start_method=args.start_method,
             state_file=args.state_file,
         )
+        logging.basicConfig(format="[%(asctime)s] %(message)s")
         try:
             f.start()
         except KeyboardInterrupt:
