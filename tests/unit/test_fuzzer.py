@@ -210,23 +210,6 @@ def test_load_crashes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert state.data
 
 
-# def test_internal_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-#     with monkeypatch.context() as p:
-#         # Letting dill.loads fail in the worker by injecting an invalid result to dill.dumps
-#         # is our only way to trigger an error. Child processes are freshly spawned and hence we
-#         # cannot monkeypatch them.
-#         p.setattr(dill, "dumps", lambda _: b"0")
-#         f = fuzzer.Fuzzer(  # pragma: no cover
-#             target=lambda _: None,
-#             crash_dir=tmp_path,
-#             max_runs=1,
-#             num_workers=1,
-#             load_crashes=False,
-#         )
-#         with pytest.raises(SystemExit, match="INTERNAL ERROR"):
-#             f.start()
-
-
 def test_worker_loop_error(monkeypatch: pytest.MonkeyPatch) -> None:
     def worker_run(
         wid: int,
