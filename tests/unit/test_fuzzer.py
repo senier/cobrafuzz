@@ -650,3 +650,26 @@ def test_terminate_workers(monkeypatch: pytest.MonkeyPatch) -> None:
         assert all(
             w[0].terminated and w[0].joined and w[0].timeout == 1 and w[1].canceled for w in workers
         )
+
+
+def test_worker_run_ignored_exception() -> None:
+    class Error:
+        def __del__(self) -> None:
+            raise DoneError("Exception in __del__")
+
+    def target(_: bytes) -> None:
+        Error()
+
+    result = fuzzer._worker_run(  # noqa: SLF001
+        wid=1,
+        target=target,
+        state=DummyState(data=b"deadbeef"),
+        runs=1,
+    )
+
+    assert isinstance(result, fuzzer.Error)
+    assert result.wid == 1
+    assert result.runs == 1
+    assert result.data == b"deadbeef"
+    assert result.message == "Exception in __del__"
+    assert result.covered
