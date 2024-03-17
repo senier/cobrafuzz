@@ -9,6 +9,7 @@ import time
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
+from types import TracebackType
 from typing import Callable, Optional, Union, cast
 
 import dill as pickle  # type: ignore[import-untyped]
@@ -57,19 +58,19 @@ class Error(Report):
     message: str
 
 
-def covered(e: Exception) -> set[tuple[Optional[str], Optional[int], str, int]]:
-    """Construct coverage information from exception."""
+def covered(t: Optional[TracebackType]) -> set[tuple[Optional[str], Optional[int], str, int]]:
+    """Construct coverage information from exception traceback."""
 
     prev_line: Optional[int] = None
     prev_file: Optional[str] = None
-    tb = e.__traceback__
-    covered = set()
+    result = set()
+    tb: Optional[TracebackType] = t
     while tb:
-        covered.add((prev_file, prev_line, tb.tb_frame.f_code.co_filename, tb.tb_lineno))
+        result.add((prev_file, prev_line, tb.tb_frame.f_code.co_filename, tb.tb_lineno))
         prev_line = tb.tb_lineno
         prev_file = tb.tb_frame.f_code.co_filename
         tb = tb.tb_next
-    return covered
+    return result
 
 
 def worker(  # noqa: PLR0913
@@ -163,7 +164,24 @@ def _worker_run(
 ) -> StatusBase:
     tracer.reset()
 
+    unraisable_covered: Optional[set[tuple[Optional[str], Optional[int], str, int]]] = None
+    unraisable_message: Optional[str] = None
+
     data = state.get_input()
+
+    def unraisablehook(unraisable: sys.UnraisableHookArgs) -> None:
+        message = (
+            "\n".join(map(str, unraisable.exc_value.args))
+            if unraisable.exc_value
+            else "Unraisable exception"
+        )
+        nonlocal unraisable_covered, unraisable_message
+        unraisable_covered = covered(unraisable.exc_traceback)
+        unraisable_message = message
+        del unraisable
+
+    _old_unraisablehook = sys.unraisablehook
+    sys.unraisablehook = unraisablehook
 
     try:
         target(bytes(data))
@@ -172,8 +190,19 @@ def _worker_run(
             wid=wid,
             runs=runs,
             data=data,
-            covered=covered(e),
+            covered=covered(e.__traceback__),
             message=f"{traceback.format_exc()}",
+        )
+    finally:
+        sys.unraisablehook = _old_unraisablehook
+
+    if unraisable_message:
+        return Error(
+            wid=wid,
+            runs=runs,
+            data=data,
+            covered=unraisable_covered or set(),
+            message=unraisable_message,
         )
 
     new_path = state.store_coverage(data=tracer.get_covered())
@@ -299,7 +328,7 @@ class Fuzzer:
                     target(f.read())
                 except Exception as e:  # noqa: BLE001
                     if regression:
-                        changed = local_state.store_coverage(covered(e))
+                        changed = local_state.store_coverage(covered(e.__traceback__))
                         if changed:
                             logging.info(
                                 "\n========================================================================\n"
@@ -308,7 +337,7 @@ class Fuzzer:
                                 traceback.format_exc(),
                             )
                     else:
-                        self._state.store_coverage(covered(e))
+                        self._state.store_coverage(covered(e.__traceback__))
                 else:
                     if regression:
                         logging.info("No error when testing %s", error_file)

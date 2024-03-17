@@ -84,7 +84,7 @@ def bench_paths(args: argparse.Namespace) -> None:
                 increased = st.store_coverage(tracer.get_covered())
             except Exception as e:  # noqa: BLE001
                 traceback.print_exc()
-                st.store_coverage(fuzzer.covered(e))
+                st.store_coverage(fuzzer.covered(e.__traceback__))
                 increased = True
 
             st.update(success=increased)
