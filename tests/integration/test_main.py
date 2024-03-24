@@ -18,6 +18,7 @@ def test_main(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
                 "main",
                 "--crash-dir",
                 str(tmp_path),
+                "fuzz",
                 "--max-runs",
                 "500",
                 "--max-crashes",

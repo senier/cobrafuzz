@@ -10,7 +10,7 @@ from cobrafuzz import fuzzer
 from cobrafuzz.main import CobraFuzz
 
 
-def test_main(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_main_fuzz(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     args: Optional[dict[str, Union[bool, int, Path]]] = None
 
     class Fuzzer:
@@ -29,6 +29,7 @@ def test_main(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
                 "main",
                 "--crash-dir",
                 str(tmp_path),
+                "fuzz",
                 "--max-runs",
                 "500",
                 "--max-crashes",
@@ -42,6 +43,48 @@ def test_main(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         assert args["crash_dir"] == tmp_path
         assert args["max_runs"] == 500
         assert args["max_crashes"] == 1
+
+
+def test_main_show(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    args: Optional[dict[str, Union[bool, int, Path]]] = None
+
+    class Fuzzer:
+        def __init__(self, **a: Union[bool, int, Path]) -> None:
+            nonlocal args
+            args = a
+
+    with monkeypatch.context() as mp:
+        mp.setattr(
+            sys,
+            "argv",
+            [
+                "main",
+                "--crash-dir",
+                str(tmp_path),
+                "show",
+            ],
+        )
+        mp.setattr(fuzzer, "Fuzzer", Fuzzer)
+        c = CobraFuzz(lambda _: None)  # pragma: no cover
+        c()
+        assert args is not None
+        assert args["crash_dir"] == tmp_path
+
+
+def test_main_no_subcommand(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    with monkeypatch.context() as mp:
+        mp.setattr(
+            sys,
+            "argv",
+            [
+                "main",
+                "--crash-dir",
+                str(tmp_path),
+            ],
+        )
+        c = CobraFuzz(lambda _: None)  # pragma: no cover
+        with pytest.raises(SystemExit, match="^3$"):
+            c()
 
 
 def test_keyboard_interrupt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -60,6 +103,7 @@ def test_keyboard_interrupt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
                 "main",
                 "--crash-dir",
                 str(tmp_path),
+                "fuzz",
                 "--max-runs",
                 "500",
                 "--max-crashes",
