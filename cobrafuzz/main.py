@@ -20,63 +20,72 @@ class CobraFuzz:
             required=True,
             help="Crash output directory.",
         )
-        parser.add_argument(
-            "--regression",
-            action="store_true",
-            help="Runner target on examples in crash directory, print errors and exit.",
-        )
 
-        parser.add_argument(
+        subparsers = parser.add_subparsers(dest="subcommands")
+
+        parser_show = subparsers.add_parser(
+            "show",
+            help="Run target on examples in crash directory, print errors and exit.",
+        )
+        parser_show.set_defaults(func=self.show)
+
+        parser_fuzz = subparsers.add_parser(
+            "fuzz",
+            help="Fuzz target.",
+        )
+        parser_fuzz.set_defaults(func=self.fuzz)
+
+        parser_fuzz.add_argument(
             "-j",
             "--num-workers",
             type=int,
             help="Number of parallel workers (default: one less than CPUs available).",
         )
-        parser.add_argument(
+        parser_fuzz.add_argument(
             "--max-input-size",
             type=int,
             default=4096,
             help="Max input size to be generated in bytes.",
         )
-        parser.add_argument(
+        parser_fuzz.add_argument(
             "--close-stdout",
             action="store_true",
             help="Close standard output on worker startup.",
         )
-        parser.add_argument(
+        parser_fuzz.add_argument(
             "--close-stderr",
             action="store_true",
             help="Close standard error on worker startup.",
         )
-        parser.add_argument(
+        parser_fuzz.add_argument(
             "--max-crashes",
             type=int,
             help="Maximum number crashes before exiting.",
         )
-        parser.add_argument(
+        parser_fuzz.add_argument(
             "--max-runs",
             type=int,
             help="Maximum number test runs to perform.",
         )
-        parser.add_argument(
+        parser_fuzz.add_argument(
             "--max-time",
             type=int,
             help="Maximum number of seconds to run the fuzzer.",
         )
-        parser.add_argument(
+        parser_fuzz.add_argument(
             "--start-method",
             type=str,
             choices=["spawn", "forkserver", "fork"],
             default="spawn",
             help="Start method to be used for multiprocessing (default: %(default)s).",
         )
-        parser.add_argument(
+        parser_fuzz.add_argument(
             "--state-file",
             type=Path,
             help="File to periodically store fuzzer state to.",
         )
 
-        parser.add_argument(
+        parser_fuzz.add_argument(
             "seeds",
             type=Path,
             nargs="*",
@@ -84,6 +93,16 @@ class CobraFuzz:
         )
 
         args = parser.parse_args()
+
+        if not args.subcommands:
+            parser.exit(3)
+
+        args.func(args)
+
+    def show(self, args: argparse.Namespace) -> None:
+        fuzzer.Fuzzer(crash_dir=args.crash_dir, target=self.function, regression=True)
+
+    def fuzz(self, args: argparse.Namespace) -> None:
         f = fuzzer.Fuzzer(
             crash_dir=args.crash_dir,
             target=self.function,
@@ -94,7 +113,6 @@ class CobraFuzz:
             max_runs=args.max_runs,
             max_time=args.max_time,
             num_workers=args.num_workers,
-            regression=args.regression,
             seeds=args.seeds,
             start_method=args.start_method,
             state_file=args.state_file,

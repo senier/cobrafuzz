@@ -36,6 +36,7 @@ def test_example(
                 "fuzz",
                 "--crash-dir",
                 str(tmp_path),
+                "fuzz",
                 "--max-runs",
                 "100",
                 "examples/fuzz_{test}/seeds",
