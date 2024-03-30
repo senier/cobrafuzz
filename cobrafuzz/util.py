@@ -26,6 +26,20 @@ class Param(ParamBase[int]):
         pass
 
 
+class Params:
+    def __init__(self, **kwargs: ParamBase[int]):
+        self._data: dict[str, ParamBase[int]] = kwargs
+
+    def __getattr__(self, attr: str) -> ParamBase[int]:
+        if attr.startswith("_") or attr not in self._data:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
+        return self._data[attr]
+
+    def update(self, success: bool = False) -> None:
+        for rand in self._data.values():
+            rand.update(success=success)
+
+
 class AdaptiveRandBase(ParamBase[PopulationType]):
     def _succeed(self) -> None:
         raise NotImplementedError
