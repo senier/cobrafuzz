@@ -7,23 +7,9 @@ from typing import Callable, Optional
 from . import common, util
 
 
-class Params:
-    def __init__(self, **kwargs: util.ParamBase[int]):
-        self._data: dict[str, util.ParamBase[int]] = kwargs
-
-    def __getattr__(self, attr: str) -> util.ParamBase[int]:
-        if attr.startswith("_") or attr not in self._data:
-            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
-        return self._data[attr]
-
-    def update(self, success: bool = False) -> None:
-        for rand in self._data.values():
-            rand.update(success=success)
-
-
 def _mutate_remove_range_of_bytes(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 2:
@@ -36,7 +22,7 @@ def _mutate_remove_range_of_bytes(
 
 def _mutate_insert_range_of_bytes(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     assert isinstance(rand.length, util.AdaptiveRange)
@@ -49,7 +35,7 @@ def _mutate_insert_range_of_bytes(
 
 def _mutate_duplicate_range_of_bytes(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 2:
@@ -65,7 +51,7 @@ def _mutate_duplicate_range_of_bytes(
 
 def _mutate_copy_range_of_bytes(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 2:
@@ -81,7 +67,7 @@ def _mutate_copy_range_of_bytes(
 
 def _mutate_bit_flip(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 1:
@@ -95,7 +81,7 @@ def _mutate_bit_flip(
 
 def _mutate_flip_random_bits_of_random_byte(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 1:
@@ -108,7 +94,7 @@ def _mutate_flip_random_bits_of_random_byte(
 
 def _mutate_swap_two_bytes(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 2:
@@ -122,7 +108,7 @@ def _mutate_swap_two_bytes(
 
 def _mutate_add_subtract_from_a_byte(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 1:
@@ -136,7 +122,7 @@ def _mutate_add_subtract_from_a_byte(
 
 def _mutate_add_subtract_from_a_uint16(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 2:
@@ -154,7 +140,7 @@ def _mutate_add_subtract_from_a_uint16(
 
 def _mutate_add_subtract_from_a_uint32(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 4:
@@ -173,7 +159,7 @@ def _mutate_add_subtract_from_a_uint32(
 
 def _mutate_add_subtract_from_a_uint64(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 8:
@@ -196,7 +182,7 @@ def _mutate_add_subtract_from_a_uint64(
 
 def _mutate_replace_a_byte_with_an_interesting_value(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 1:
@@ -209,7 +195,7 @@ def _mutate_replace_a_byte_with_an_interesting_value(
 
 def _mutate_replace_an_uint16_with_an_interesting_value(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 2:
@@ -226,7 +212,7 @@ def _mutate_replace_an_uint16_with_an_interesting_value(
 
 def _mutate_replace_an_uint32_with_an_interesting_value(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 4:
@@ -245,7 +231,7 @@ def _mutate_replace_an_uint32_with_an_interesting_value(
 
 def _mutate_replace_an_ascii_digit_with_another_digit(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     _inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     digits_present = [i for i in range(len(res)) if ord("0") <= res[i] <= ord("9")]
@@ -259,7 +245,7 @@ def _mutate_replace_an_ascii_digit_with_another_digit(
 
 def _mutate_splice(
     res: bytearray,
-    rand: Params,
+    rand: util.Params,
     inputs: Optional[util.AdaptiveChoiceBase[bytearray]] = None,
 ) -> None:
     if len(res) < 1:
@@ -288,19 +274,22 @@ class Mutator:
         self._max_modifications = max_modifications
         self._modifications = util.AdaptiveRange(adaptive=adaptive)
         self._mutators: util.AdaptiveChoiceBase[
-            tuple[Callable[[bytearray, Params, util.AdaptiveChoiceBase[bytearray]], None], Params]
+            tuple[
+                Callable[[bytearray, util.Params, util.AdaptiveChoiceBase[bytearray]], None],
+                util.Params,
+            ]
         ] = util.AdaptiveChoiceBase(
             population=[
                 (
                     _mutate_remove_range_of_bytes,
-                    Params(
+                    util.Params(
                         length=util.AdaptiveRange(adaptive=adaptive),
                         start=util.AdaptiveRange(adaptive=adaptive),
                     ),
                 ),
                 (
                     _mutate_insert_range_of_bytes,
-                    Params(
+                    util.Params(
                         length=util.AdaptiveRange(adaptive=adaptive),
                         start=util.AdaptiveRange(adaptive=adaptive),
                         data=util.AdaptiveRange(adaptive=adaptive),
@@ -309,7 +298,7 @@ class Mutator:
                 ),
                 (
                     _mutate_duplicate_range_of_bytes,
-                    Params(
+                    util.Params(
                         src_pos=util.AdaptiveRange(adaptive=adaptive),
                         dst_pos=util.AdaptiveRange(adaptive=adaptive),
                         length=util.AdaptiveRange(adaptive=adaptive),
@@ -317,7 +306,7 @@ class Mutator:
                 ),
                 (
                     _mutate_copy_range_of_bytes,
-                    Params(
+                    util.Params(
                         src_pos=util.AdaptiveRange(adaptive=adaptive),
                         dst_pos=util.AdaptiveRange(adaptive=adaptive),
                         length=util.AdaptiveRange(adaptive=adaptive),
@@ -325,35 +314,35 @@ class Mutator:
                 ),
                 (
                     _mutate_bit_flip,
-                    Params(
+                    util.Params(
                         byte_pos=util.AdaptiveRange(adaptive=adaptive),
                         bit_pos=util.AdaptiveRange(adaptive=adaptive),
                     ),
                 ),
                 (
                     _mutate_flip_random_bits_of_random_byte,
-                    Params(
+                    util.Params(
                         pos=util.AdaptiveRange(adaptive=adaptive),
                         value=util.AdaptiveRange(adaptive=adaptive),
                     ),
                 ),
                 (
                     _mutate_swap_two_bytes,
-                    Params(
+                    util.Params(
                         first_pos=util.AdaptiveRange(adaptive=adaptive),
                         second_pos=util.AdaptiveRange(adaptive=adaptive),
                     ),
                 ),
                 (
                     _mutate_add_subtract_from_a_byte,
-                    Params(
+                    util.Params(
                         pos=util.AdaptiveRange(adaptive=adaptive),
                         value=util.AdaptiveRange(adaptive=adaptive),
                     ),
                 ),
                 (
                     _mutate_add_subtract_from_a_uint16,
-                    Params(
+                    util.Params(
                         pos=util.AdaptiveRange(adaptive=adaptive),
                         value=util.AdaptiveRange(adaptive=adaptive),
                         big_endian=util.AdaptiveRange(adaptive=adaptive),
@@ -361,7 +350,7 @@ class Mutator:
                 ),
                 (
                     _mutate_add_subtract_from_a_uint32,
-                    Params(
+                    util.Params(
                         pos=util.AdaptiveRange(adaptive=adaptive),
                         value=util.AdaptiveRange(adaptive=adaptive),
                         big_endian=util.AdaptiveRange(adaptive=adaptive),
@@ -369,7 +358,7 @@ class Mutator:
                 ),
                 (
                     _mutate_add_subtract_from_a_uint64,
-                    Params(
+                    util.Params(
                         pos=util.AdaptiveRange(adaptive=adaptive),
                         value=util.AdaptiveRange(adaptive=adaptive),
                         big_endian=util.AdaptiveRange(adaptive=adaptive),
@@ -377,7 +366,7 @@ class Mutator:
                 ),
                 (
                     _mutate_replace_a_byte_with_an_interesting_value,
-                    Params(
+                    util.Params(
                         pos=util.AdaptiveRange(adaptive=adaptive),
                         interesting_8=util.AdaptiveChoiceBase(
                             population=[1, 1, 16, 32, 64, 100, 127, 128, 129, 255],
@@ -387,7 +376,7 @@ class Mutator:
                 ),
                 (
                     _mutate_replace_an_uint16_with_an_interesting_value,
-                    Params(
+                    util.Params(
                         pos=util.AdaptiveRange(adaptive=adaptive),
                         interesting_16=util.AdaptiveChoiceBase(
                             population=[0, 128, 255, 256, 512, 1000, 1024, 4096, 32767, 65535],
@@ -398,7 +387,7 @@ class Mutator:
                 ),
                 (
                     _mutate_replace_an_uint32_with_an_interesting_value,
-                    Params(
+                    util.Params(
                         pos=util.AdaptiveRange(adaptive=adaptive),
                         interesting_32=util.AdaptiveChoiceBase(
                             population=[
@@ -418,7 +407,7 @@ class Mutator:
                 ),
                 (
                     _mutate_replace_an_ascii_digit_with_another_digit,
-                    Params(
+                    util.Params(
                         pos=util.AdaptiveRange(adaptive=adaptive),
                         digits=util.AdaptiveChoiceBase(
                             population=[
@@ -430,14 +419,14 @@ class Mutator:
                 ),
                 (
                     _mutate_splice,
-                    Params(
+                    util.Params(
                         left_pos=util.AdaptiveRange(adaptive=adaptive),
                         right_pos=util.AdaptiveRange(adaptive=adaptive),
                     ),
                 ),
             ],
         )
-        self._last_rands: Optional[Params] = None
+        self._last_rands: Optional[util.Params] = None
 
     def _mutate(self, buf: bytearray) -> bytearray:
         res = buf[:]
