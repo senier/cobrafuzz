@@ -4,3 +4,7 @@ class OutOfDataError(Exception):
 
 class OutOfBoundsError(Exception):
     pass
+
+
+class InvalidSampleError(Exception):
+    pass

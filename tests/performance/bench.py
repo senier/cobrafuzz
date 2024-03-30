@@ -13,7 +13,7 @@ import plotly.colors  # type: ignore[import-untyped]
 import plotly.graph_objects as go  # type: ignore[import-untyped]
 from plotly.subplots import make_subplots  # type: ignore[import-untyped]
 
-from cobrafuzz import fuzzer, mutator, state, tracer
+from cobrafuzz import mutator, state, tracer, util
 
 EXAMPLES = [
     "aifc",
@@ -84,7 +84,7 @@ def bench_paths(args: argparse.Namespace) -> None:
                 increased = st.store_coverage(tracer.get_covered())
             except Exception as e:  # noqa: BLE001
                 traceback.print_exc()
-                st.store_coverage(fuzzer.covered(e.__traceback__))
+                st.store_coverage(util.covered(e.__traceback__))
                 increased = True
 
             st.update(success=increased)

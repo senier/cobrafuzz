@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 import pytest
 
-from cobrafuzz import fuzzer
+from cobrafuzz import fuzzer, simplifier
 from cobrafuzz.main import CobraFuzz
 
 
@@ -69,6 +69,42 @@ def test_main_show(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         c()
         assert args is not None
         assert args["crash_dir"] == tmp_path
+
+
+def test_main_simp(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    args: Optional[dict[str, Union[Path, Callable[[bytes], None]]]] = None
+    simplify_called: bool = False
+
+    class Simp:
+        def __init__(self, **a: Union[Path, Callable[[bytes], None]]) -> None:
+            nonlocal args
+            args = a
+
+        def simplify(self) -> None:
+            nonlocal simplify_called
+            simplify_called = True
+
+    with monkeypatch.context() as mp:
+        mp.setattr(
+            sys,
+            "argv",
+            [
+                "main",
+                "--crash-dir",
+                str(tmp_path / "crash"),
+                "simp",
+                "--output-dir",
+                str(tmp_path / "output"),
+            ],
+        )
+        mp.setattr(simplifier, "Simp", Simp)
+        c = CobraFuzz(lambda _: None)  # pragma: no cover
+        c()
+        assert simplify_called
+        assert args is not None
+        assert args["crash_dir"] == tmp_path / "crash"
+        assert args["output_dir"] == tmp_path / "output"
+        assert args["target"] is not None
 
 
 def test_main_no_subcommand(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

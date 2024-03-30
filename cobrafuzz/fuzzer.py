@@ -9,12 +9,11 @@ import time
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
-from types import TracebackType
 from typing import Callable, Optional, Union, cast
 
 import dill as pickle  # type: ignore[import-untyped]
 
-from cobrafuzz import state as st, tracer
+from cobrafuzz import state as st, tracer, util
 
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -56,21 +55,6 @@ class Report(Result):
 @dataclass
 class Error(Report):
     message: str
-
-
-def covered(t: Optional[TracebackType]) -> set[tuple[Optional[str], Optional[int], str, int]]:
-    """Construct coverage information from exception traceback."""
-
-    prev_line: Optional[int] = None
-    prev_file: Optional[str] = None
-    result = set()
-    tb: Optional[TracebackType] = t
-    while tb:
-        result.add((prev_file, prev_line, tb.tb_frame.f_code.co_filename, tb.tb_lineno))
-        prev_line = tb.tb_lineno
-        prev_file = tb.tb_frame.f_code.co_filename
-        tb = tb.tb_next
-    return result
 
 
 def worker(  # noqa: PLR0913
@@ -176,7 +160,7 @@ def _worker_run(
             else "Unraisable exception"
         )
         nonlocal unraisable_covered, unraisable_message
-        unraisable_covered = covered(unraisable.exc_traceback)
+        unraisable_covered = util.covered(unraisable.exc_traceback)
         unraisable_message = message
         del unraisable
 
@@ -190,7 +174,7 @@ def _worker_run(
             wid=wid,
             runs=runs,
             data=data,
-            covered=covered(e.__traceback__),
+            covered=util.covered(e.__traceback__),
             message=f"{traceback.format_exc()}",
         )
     finally:
@@ -328,7 +312,7 @@ class Fuzzer:
                     target(f.read())
                 except Exception as e:  # noqa: BLE001
                     if regression:
-                        changed = local_state.store_coverage(covered(e.__traceback__))
+                        changed = local_state.store_coverage(util.covered(e.__traceback__))
                         if changed:
                             logging.info(
                                 "\n========================================================================\n"
@@ -337,7 +321,7 @@ class Fuzzer:
                                 traceback.format_exc(),
                             )
                     else:
-                        self._state.store_coverage(covered(e.__traceback__))
+                        self._state.store_coverage(util.covered(e.__traceback__))
                 else:
                     if regression:
                         logging.info("No error when testing %s", error_file)

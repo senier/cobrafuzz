@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-from cobrafuzz import fuzzer
+from cobrafuzz import fuzzer, simplifier
 
 
 class CobraFuzz:
@@ -28,6 +28,18 @@ class CobraFuzz:
             help="Run target on examples in crash directory, print errors and exit.",
         )
         parser_show.set_defaults(func=self.show)
+
+        parser_simp = subparsers.add_parser(
+            "simp",
+            help="Simplify crashes output.",
+        )
+        parser_simp.add_argument(
+            "--output-dir",
+            type=Path,
+            required=True,
+            help="Simplified output directory.",
+        )
+        parser_simp.set_defaults(func=self.simp)
 
         parser_fuzz = subparsers.add_parser(
             "fuzz",
@@ -122,3 +134,10 @@ class CobraFuzz:
             f.start()
         except KeyboardInterrupt:
             sys.exit("\nUser cancellation. Exiting.\n")
+
+    def simp(self, args: argparse.Namespace) -> None:
+        simplifier.Simp(
+            crash_dir=args.crash_dir,
+            target=self.function,
+            output_dir=args.output_dir,
+        ).simplify()

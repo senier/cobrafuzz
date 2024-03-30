@@ -47,10 +47,10 @@ format:
 	black $(PYTHON_PACKAGES)
 
 fuzz-%:
-	@$(PYTHON) examples/fuzz_$*/fuzz.py --crash-dir examples/fuzz_$*/crashes --state examples/fuzz_$*/state.json --close-stdout --close-stderr examples/fuzz_$*/seeds
+	@$(PYTHON) examples/fuzz_$*/fuzz.py --crash-dir examples/fuzz_$*/crashes fuzz --state examples/fuzz_$*/state.json --close-stdout --close-stderr examples/fuzz_$*/seeds
 
-regr-%:
-	@$(PYTHON) examples/fuzz_$*/fuzz.py --crash-dir examples/fuzz_$*/crashes --regression
+show-%:
+	@$(PYTHON) examples/fuzz_$*/fuzz.py --crash-dir examples/fuzz_$*/crashes show
 
 clean-%:
 	@rm -f examples/fuzz_$*/state.json
