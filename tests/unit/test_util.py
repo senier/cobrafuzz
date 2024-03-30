@@ -187,6 +187,14 @@ def test_param() -> None:
     assert p() == 5
 
 
+def test_adaptive_choice_invalid() -> None:
+    c: util.AdaptiveChoiceBase[int] = util.AdaptiveChoiceBase(population=[], adaptive=True)
+    assert c._population == []
+    assert c._distribution == []
+    with pytest.raises(common.OutOfBoundsError, match=r"^No samples$"):
+        c.sample()
+
+
 def test_adaptive_choice() -> None:
     c = util.AdaptiveChoiceBase(population=[1], adaptive=True)
     assert c._population == [1]

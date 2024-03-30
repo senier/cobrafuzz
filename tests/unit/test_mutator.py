@@ -7,15 +7,7 @@ from typing import Optional
 import pytest
 
 from cobrafuzz import common, mutator, util
-
-
-class StaticRand(util.AdaptiveRange):
-    def __init__(self, value: int) -> None:
-        super().__init__()
-        self._value = value
-
-    def sample(self, _lower: int, _upper: int) -> int:
-        return self._value
+from tests.utils import StaticRand
 
 
 class Param(util.Param):

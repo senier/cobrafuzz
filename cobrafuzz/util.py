@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from abc import abstractmethod
+from types import TracebackType
 from typing import Generator, Generic, Optional, TypeVar
 
 from . import common
@@ -131,6 +132,8 @@ class AdaptiveChoiceBase(AdaptiveRandBase[PopulationType]):
             self._distribution.append(1)
 
     def sample(self) -> PopulationType:
+        if len(self._population) < 1:
+            raise common.OutOfBoundsError("No samples")
         if self._distribution is None:
             return random.choice(self._population)  # noqa: S311
         self._last = random.choices(self._population, self._distribution, k=1)[0]  # noqa: S311
@@ -202,3 +205,21 @@ def insert(data: bytearray, start: int, data_to_insert: bytes) -> None:
     if start > len(data):
         raise common.OutOfBoundsError("Start out of range")
     data[:] = data[:start] + data_to_insert + data[start:]
+
+
+def covered(
+    t: Optional[TracebackType],
+    skip_first_n: int = 0,
+) -> set[tuple[Optional[str], Optional[int], str, int]]:
+    """Construct coverage information from exception traceback."""
+
+    prev_line: Optional[int] = None
+    prev_file: Optional[str] = None
+    result: list[tuple[Optional[str], Optional[int], str, int]] = []
+    tb: Optional[TracebackType] = t
+    while tb:
+        result.append((prev_file, prev_line, tb.tb_frame.f_code.co_filename, tb.tb_lineno))
+        prev_line = tb.tb_lineno
+        prev_file = tb.tb_frame.f_code.co_filename
+        tb = tb.tb_next
+    return set(result[skip_first_n:])
