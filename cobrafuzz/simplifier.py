@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Iterator, Optional
 
 from cobrafuzz import common, util
 
@@ -19,6 +20,17 @@ def _simplify_remove_line(
 
 def _metrics(data: bytes) -> list[int]:
     return [len(data), len([n for n in data if n == ord("\n")])]
+
+
+@contextmanager
+def disable_logging() -> Iterator[None]:
+    previous_level = logging.root.manager.disable
+    logging.disable(logging.CRITICAL)
+
+    try:
+        yield
+    finally:
+        logging.disable(previous_level)
 
 
 class Simp:
@@ -77,7 +89,8 @@ class Simp:
             modify, self._last_rands = self._mutators.sample()
 
             try:
-                self._target(current_data)
+                with disable_logging():
+                    self._target(current_data)
             except Exception as e:  # noqa: BLE001
                 covered = util.covered(e.__traceback__, 1)
                 current_metrics = _metrics(current_data)
