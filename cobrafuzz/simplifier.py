@@ -18,6 +18,25 @@ def _simplify_remove_line(
     return b"\n".join(lines[0 : pos - 1] + lines[pos:])
 
 
+def _simplify_remove_characters(
+    data: bytes,
+    rand: util.Params,
+) -> bytes:
+    assert isinstance(rand.start, util.AdaptiveRange)
+    assert isinstance(rand.length, util.AdaptiveRange)
+    length = rand.length.sample(1, 9)
+    start = rand.start.sample(0, len(data) - length)
+    # Do not remove line breaks
+    if b"\n" in data[start : start + length]:
+        return data
+    # Do not remove leading whitespace
+    if data[: start + 1].split(b"\n")[-1].isspace():
+        return data
+    res = bytearray(data)
+    util.remove(data=res, start=start, length=length)
+    return bytes(res)
+
+
 def _metrics(data: bytes) -> list[int]:
     return [len(data), len([n for n in data if n == ord("\n")])]
 
@@ -52,7 +71,13 @@ class Simp:
                 util.Params,
             ]
         ] = util.AdaptiveChoiceBase(
-            population=[(_simplify_remove_line, util.Params(pos=util.AdaptiveRange()))],
+            population=[
+                (_simplify_remove_line, util.Params(pos=util.AdaptiveRange())),
+                (
+                    _simplify_remove_characters,
+                    util.Params(start=util.AdaptiveRange(), length=util.AdaptiveRange()),
+                ),
+            ],
         )
 
     def simplify(self) -> None:
