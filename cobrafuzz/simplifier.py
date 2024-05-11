@@ -138,6 +138,8 @@ class Simp:
             improvement = any(p > c for c, p in diff_metrics)
 
             if no_decline and improvement:
+                self._last_rands.update(success=True)
+                self._mutators.update(success=True)
                 result = current_data
                 previous_metrics = current_metrics
                 steps = 0
