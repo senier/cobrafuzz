@@ -96,6 +96,11 @@ class CobraFuzz:
             type=Path,
             help="File to periodically store fuzzer state to.",
         )
+        parser_fuzz.add_argument(
+            "--simplify",
+            type=Path,
+            help="Run simplifier and store results in directory.",
+        )
 
         parser_fuzz.add_argument(
             "seeds",
@@ -128,6 +133,7 @@ class CobraFuzz:
             seeds=args.seeds,
             start_method=args.start_method,
             state_file=args.state_file,
+            simplify=args.simplify,
         )
         logging.basicConfig(format="[%(asctime)s] %(message)s")
         try:

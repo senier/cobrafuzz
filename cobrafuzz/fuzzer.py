@@ -13,7 +13,7 @@ from typing import Callable, Optional, Union, cast
 
 import dill as pickle  # type: ignore[import-untyped]
 
-from cobrafuzz import state as st, tracer, util
+from cobrafuzz import simplifier, state as st, tracer, util
 
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -220,6 +220,7 @@ class Fuzzer:
         start_method: Optional[str] = None,
         state_file: Optional[Path] = None,
         load_crashes: bool = True,
+        simplify: Optional[Path] = None,
     ):
         """
         Fuzz-test target and store crash artifacts into crash_dir.
@@ -245,6 +246,8 @@ class Fuzzer:
                             Use None to spawn one fewer than CPUs available.
         regression:         Execute target on all samples found in crash_dir, print errors and exit.
         seeds:              List of files and directories to seed the fuzzer with.
+        simplify:           When set, run simplifier and store simplified crash results in
+                            directory.
         start_method:       Multiprocessing start method to use (spawn, forkserver or fork).
                             Defaults to "spawn". Do not use "fork" as it is unreliable and may lead
                             to deadlocks.
@@ -271,6 +274,7 @@ class Fuzzer:
         self._workers: list[tuple[MPProcess, mp.Queue[Update]]] = []
 
         self._crash_dir = crash_dir
+        self._target = target
         self._target_bytes = pickle.dumps(target)
 
         self._close_stderr = close_stderr or False
@@ -288,6 +292,7 @@ class Fuzzer:
             max_insert_length=max_insert_length,
             file=state_file,
         )
+        self._simplify = simplify
 
         if load_crashes:
             self._load_crashes(regression=regression)
@@ -473,4 +478,14 @@ class Fuzzer:
         self._state.save()
 
         self._terminate_workers()
-        sys.exit(0 if self._current_crashes == 0 else 1)
+
+        if self._current_crashes:
+            if self._simplify:
+                simplifier.Simp(
+                    crash_dir=self._crash_dir,
+                    target=self._target,
+                    output_dir=self._simplify,
+                ).simplify()
+            sys.exit(1)
+
+        sys.exit(0)
