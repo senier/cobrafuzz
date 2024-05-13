@@ -1,4 +1,4 @@
-PYTHON_PACKAGES = cobrafuzz/*.py tests/**/*.py examples/**/*.py
+PYTHON_PACKAGES = cobrafuzz/*.py tests/*.py tests/**/*.py examples/**/*.py
 PYTHON ?= python3
 PYTEST = $(PYTHON) -m pytest
 
@@ -24,7 +24,7 @@ check_dead_code: .devel_installed
 check_todo:
 	grep --line-number --color=auto -e '#\s*TODO.*$$' **/*.py
 
-test: test_unit test_integration test_build
+test: test_unit test_integration test_build test_doc
 
 test_unit: .devel_installed
 	PYTHONPATH=. timeout -k 30 360 $(PYTEST) -vv --cov-report term:skip-covered --cov-report xml:coverage.xml --cov=cobrafuzz --cov=tests.unit --cov-branch --cov-fail-under=100 tests/unit
@@ -34,6 +34,9 @@ test_integration: .devel_installed
 
 test_build: .devel_installed
 	$(PYTHON) -m build
+
+test_doc: .devel_installed
+	PYTHONPATH=. timeout -k 30 360 $(PYTEST) -vv tests/test_doc.py
 
 install_devel: .devel_installed
 
@@ -59,4 +62,4 @@ clean-%:
 clean:
 	rm -rf dist cobrafuzz.egg-info crashes .devel_installed .ruff_cache build
 
-.PHONY: check check_black check_kacl check_mypy check_ruff test test_build test_integration test_unit install_devel
+.PHONY: check check_black check_kacl check_mypy check_ruff test test_build test_integration test_unit test_doc install_devel

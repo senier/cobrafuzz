@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Introduce subcommands for fuzzing, result display and simplification
 
+### Fixed
+
+- Code examples in README (#48)
+
 ## [2.2.0] - 2024-03-19
 
 ### Added

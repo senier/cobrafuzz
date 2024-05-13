@@ -16,22 +16,22 @@ It makes a good addition to classic unit-testing.
 The first step is to implement a function to be fuzz-tested, also called a fuzz target.
 Here is an example of a simple fuzz target for the built-in `html` module
 
-```python
-from html.parser import HTMLParser
+```python,examples/fuzz_htmlparser/fuzz.py
 from cobrafuzz.main import CobraFuzz
 
 
 @CobraFuzz
-def fuzz(buf):
+def fuzz(buf: bytes) -> None:
+    from html.parser import HTMLParser
+
     try:
-        string = buf.decode("ascii")
         parser = HTMLParser()
-        parser.feed(string)
+        parser.feed(buf.decode("ascii"))
     except UnicodeDecodeError:
         pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     fuzz()
 ```
 
@@ -51,7 +51,7 @@ The next step is to download CobraFuzz and then run the fuzzer:
 $ pip install cobrafuzz
 [...]
 
-$ python examples/htmlparser/fuzz.py --crash-dir results --max-crashes 1
+$ python examples/fuzz_htmlparser/fuzz.py --crash-dir results fuzz --max-crashes 1
 #0 READ units: 1 workers: 7 seeds: 1
 #1 NEW     cov: 279 corp: 1 exec/s: 89 crashes: 0
 #5 NEW     cov: 366 corp: 2 exec/s: 299 crashes: 0
