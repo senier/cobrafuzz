@@ -7,13 +7,13 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Callable, Generic, Optional, Tuple, TypeVar, cast
+from typing import Callable, Generic, Optional, Tuple, TypeVar, Union, cast
 
 import dill  # type: ignore[import-untyped]
 import pytest
 
 import tests.utils
-from cobrafuzz import fuzzer, state as st
+from cobrafuzz import fuzzer, simplifier, state as st
 
 QueueType = TypeVar("QueueType")
 
@@ -533,6 +533,70 @@ def test_start_error(
         ("root", logging.INFO, "sample = 6465616462656566"),
         ("root", logging.INFO, "Found 1 crashes, stopping."),
     ]
+
+
+def test_start_simplify(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    args: Optional[dict[str, Union[Path, Callable[[bytes], None]]]] = None
+    simplify_called: bool = False
+    state = DummyState(data=b"deadbeef", report_new_path=True)
+    result_queue: DummyQueue[fuzzer.StatusBase] = DummyQueue()
+    crash_path = tmp_path / "crash"
+    data = b"deadbeef"
+    m = hashlib.sha256()
+    m.update(data)
+    digest = m.hexdigest()
+    error = fuzzer.Error(
+        wid=1,
+        runs=1,
+        data=data,
+        covered=set(),
+        message="Test error message",
+    )
+
+    class Simp:
+        def __init__(self, **a: Union[Path, Callable[[bytes], None]]) -> None:
+            nonlocal args
+            args = a
+
+        def simplify(self) -> None:
+            nonlocal simplify_called
+            simplify_called = True
+
+    result_queue.put(error)
+    with monkeypatch.context() as p:
+        f = fuzzer.Fuzzer(  # pragma: no cover
+            target=lambda _: None,
+            crash_dir=crash_path,
+            max_crashes=1,
+            simplify=tmp_path / "simp",
+        )
+        p.setattr(f, "_state", state)
+        p.setattr(f, "_initialize_process", lambda wid: (None, None))  # noqa: ARG005
+        p.setattr(f, "_terminate_workers", lambda: None)
+        p.setattr(f, "_result_queue", result_queue)
+        p.setattr(simplifier, "Simp", Simp)
+        with pytest.raises(SystemExit, match="^1$"), caplog.at_level(logging.INFO):
+            f.start()
+
+    filename = f"crash-{digest}"
+    assert caplog.record_tuples == [
+        ("root", logging.INFO, "START units: 1, workers: 1, seeds: 0"),
+        ("root", logging.INFO, "Test error message"),
+        ("root", logging.INFO, f"Crash dir created ({crash_path})"),
+        ("root", logging.INFO, f"sample was written to {crash_path / filename}"),
+        ("root", logging.INFO, "sample = 6465616462656566"),
+        ("root", logging.INFO, "Found 1 crashes, stopping."),
+    ]
+
+    assert simplify_called
+    assert args is not None
+    assert args["crash_dir"] == crash_path
+    assert args["output_dir"] == tmp_path / "simp"
+    assert args["target"] is not None
 
 
 def test_start_bug(
