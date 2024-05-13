@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Iterator, Optional
@@ -35,6 +36,33 @@ def _simplify_remove_characters(
     res = bytearray(data)
     util.remove(data=res, start=start, length=length)
     return bytes(res)
+
+
+def _simplify_shorten_token(
+    data: bytes,
+    rand: util.Params,
+) -> bytes:
+    assert isinstance(rand.pos, util.AdaptiveRange)
+    assert isinstance(rand.pattern, util.AdaptiveRange)
+
+    pattern = (
+        # This pattern treats underscores as special characters
+        re.compile(rb"((?P<whitespace>\s+)|(?P<text>[a-zA-Z0-9]+))|([^a-zA-Z0-9])")
+        if rand.pattern.sample(lower=0, upper=1)
+        # This pattern treats underscores as part of a word
+        else re.compile(rb"((?P<whitespace>\s+)|(?P<text>\w+))|([^\w\s])")
+    )
+
+    tokens = [
+        (
+            m.group(),
+            "Whitespace" if m.group("whitespace") else "Text" if m.group("text") else "Special",
+        )
+        for m in pattern.finditer(data)
+    ]
+    text_tokens = sorted({t[0] for t in tokens if t[1] == "Text"})
+    modify = text_tokens[rand.pos.sample(0, len(text_tokens) - 1)]
+    return b"".join(t[0] if t[1] != "Text" or t[0] != modify else t[0][:-1] for t in tokens)
 
 
 def _metrics(data: bytes) -> list[int]:
@@ -75,7 +103,17 @@ class Simp:
                 (_simplify_remove_line, util.Params(pos=util.AdaptiveRange())),
                 (
                     _simplify_remove_characters,
-                    util.Params(start=util.AdaptiveRange(), length=util.AdaptiveRange()),
+                    util.Params(
+                        start=util.AdaptiveRange(),
+                        length=util.AdaptiveRange(),
+                    ),
+                ),
+                (
+                    _simplify_shorten_token,
+                    util.Params(
+                        pos=util.AdaptiveRange(),
+                        pattern=util.AdaptiveRange(),
+                    ),
                 ),
             ],
         )

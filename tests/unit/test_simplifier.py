@@ -212,6 +212,71 @@ def test_remove_characters(data: bytes, start: int, length: int, expected: bytes
     assert result == bytearray(expected)
 
 
+@pytest.mark.parametrize(
+    ("data", "pos", "expected"),
+    [
+        (
+            b"line1",
+            0,
+            b"line",
+        ),
+        (
+            b"""line1
+            line2
+            line1
+            """,
+            0,
+            b"""line
+            line2
+            line
+            """,
+        ),
+        (
+            b"""Some_Tag
+            Unrelated
+            Some_Tag
+            """,
+            0,
+            b"""Som_Tag
+            Unrelated
+            Som_Tag
+            """,
+        ),
+        (
+            b"""Some_Tag
+            Unrelated
+            Some_Tag
+            """,
+            1,
+            b"""Some_Ta
+            Unrelated
+            Some_Ta
+            """,
+        ),
+        (
+            b"""Some_Tag;
+            Unrelated;
+            Some_Tag;
+            """,
+            2,
+            b"""Some_Tag;
+            Unrelate;
+            Some_Tag;
+            """,
+        ),
+    ],
+)
+def test_shorten_token(data: bytes, pos: int, expected: bytes) -> None:
+    result = simplifier._simplify_shorten_token(
+        data,
+        util.Params(
+            pos=StaticRand(pos),
+            pattern=StaticRand(1),
+        ),
+    )
+    assert result == bytearray(expected)
+
+
 @pytest.mark.parametrize("create_output_dir", [True, False])
 def test_simplify_loop(
     create_output_dir: bool,
