@@ -11,6 +11,7 @@ import pytest
         "aifc",
         "bs",
         "charset_normalizer",
+        "cobrafuzz",
         "codeop",
         "furl",
         "htmlparser",
