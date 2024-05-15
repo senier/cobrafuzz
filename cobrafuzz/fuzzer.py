@@ -221,6 +221,7 @@ class Fuzzer:
         state_file: Optional[Path] = None,
         load_crashes: bool = True,
         simplify: Optional[Path] = None,
+        simp_steps: int = 10000,
     ):
         """
         Fuzz-test target and store crash artifacts into crash_dir.
@@ -248,6 +249,7 @@ class Fuzzer:
         seeds:              List of files and directories to seed the fuzzer with.
         simplify:           When set, run simplifier and store simplified crash results in
                             directory.
+        simp_steps:         Number of unsuccessful steps before stopping simplification.
         start_method:       Multiprocessing start method to use (spawn, forkserver or fork).
                             Defaults to "spawn". Do not use "fork" as it is unreliable and may lead
                             to deadlocks.
@@ -293,6 +295,7 @@ class Fuzzer:
             file=state_file,
         )
         self._simplify = simplify
+        self._simp_steps = simp_steps
 
         if load_crashes:
             self._load_crashes(regression=regression)
@@ -485,6 +488,7 @@ class Fuzzer:
                     crash_dir=self._crash_dir,
                     target=self._target,
                     output_dir=self._simplify,
+                    steps=self._simp_steps,
                 ).simplify()
             sys.exit(1)
 
