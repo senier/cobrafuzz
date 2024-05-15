@@ -9,14 +9,16 @@ from typing import Callable, Iterator, Optional
 from cobrafuzz import common, util
 
 
-def _simplify_remove_line(
+def _simplify_remove_lines(
     data: bytes,
     rand: util.Params,
 ) -> bytes:
     lines = data.split(b"\n")
-    assert isinstance(rand.pos, util.AdaptiveRange)
-    pos = rand.pos.sample(lower=1, upper=len(lines))
-    return b"\n".join(lines[0 : pos - 1] + lines[pos:])
+    assert isinstance(rand.start, util.AdaptiveRange)
+    assert isinstance(rand.end, util.AdaptiveRange)
+    start = rand.start.sample(lower=1, upper=len(lines))
+    end = rand.end.sample(lower=start, upper=len(lines))
+    return b"\n".join(lines[0 : start - 1] + lines[end:])
 
 
 def _simplify_remove_characters(
@@ -100,7 +102,13 @@ class Simp:
             ]
         ] = util.AdaptiveChoiceBase(
             population=[
-                (_simplify_remove_line, util.Params(pos=util.AdaptiveRange())),
+                (
+                    _simplify_remove_lines,
+                    util.Params(
+                        start=util.AdaptiveRange(),
+                        end=util.AdaptiveRange(),
+                    ),
+                ),
                 (
                     _simplify_remove_characters,
                     util.Params(
