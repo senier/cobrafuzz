@@ -39,6 +39,15 @@ class CobraFuzz:
             required=True,
             help="Simplified output directory.",
         )
+        parser_simp.add_argument(
+            "--steps",
+            type=int,
+            help=(
+                "Number of unsuccessful steps before stopping simplification "
+                "(default: %(default)d)."
+            ),
+            default=10000,
+        )
         parser_simp.set_defaults(func=self.simp)
 
         parser_fuzz = subparsers.add_parser(
@@ -57,7 +66,7 @@ class CobraFuzz:
             "--max-input-size",
             type=int,
             default=4096,
-            help="Max input size to be generated in bytes.",
+            help="Max input size to be generated in bytes (default: %(default)d).",
         )
         parser_fuzz.add_argument(
             "--close-stdout",
@@ -101,6 +110,15 @@ class CobraFuzz:
             type=Path,
             help="Run simplifier and store results in directory.",
         )
+        parser_fuzz.add_argument(
+            "--simp-steps",
+            type=int,
+            help=(
+                "Number of unsuccessful steps before stopping simplification "
+                "(default: %(default)d)."
+            ),
+            default=10000,
+        )
 
         parser_fuzz.add_argument(
             "seeds",
@@ -134,6 +152,7 @@ class CobraFuzz:
             start_method=args.start_method,
             state_file=args.state_file,
             simplify=args.simplify,
+            simp_steps=args.simp_steps,
         )
         logging.basicConfig(format="[%(asctime)s] %(message)s")
         try:
@@ -146,4 +165,5 @@ class CobraFuzz:
             crash_dir=args.crash_dir,
             target=self.function,
             output_dir=args.output_dir,
+            steps=args.steps,
         ).simplify()

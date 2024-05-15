@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Crash result simplification (#30)
+- Configurable simplification steps (#54)
 
 ### Changed
 
