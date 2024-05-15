@@ -12,12 +12,13 @@ from tests.utils import StaticRand, do_raise
 
 
 @pytest.mark.parametrize(
-    ("data", "pos", "expected"),
+    ("data", "start", "end", "expected"),
     [
         (
             b"""\
             line1
             """,
+            1,
             1,
             b"""\
             """,
@@ -28,6 +29,7 @@ from tests.utils import StaticRand, do_raise
             line2
             line3
             """,
+            1,
             1,
             b"""\
             line2
@@ -41,6 +43,7 @@ from tests.utils import StaticRand, do_raise
             line3
             """,
             2,
+            2,
             b"""\
             line1
             line3
@@ -53,18 +56,47 @@ from tests.utils import StaticRand, do_raise
             line3
             """,
             3,
+            3,
             b"""\
             line1
             line2
             """,
         ),
+        (
+            b"""\
+            line1
+            line2
+            line3
+            line4
+            line5
+            """,
+            3,
+            4,
+            b"""\
+            line1
+            line2
+            line5
+            """,
+        ),
+        (
+            b"""\
+            line1
+            line2
+            line3
+            """,
+            1,
+            3,
+            b"""\
+            """,
+        ),
     ],
 )
-def test_remove_line(data: bytes, pos: int, expected: bytes) -> None:
-    result = simplifier._simplify_remove_line(
+def test_remove_lines(data: bytes, start: int, end: int, expected: bytes) -> None:
+    result = simplifier._simplify_remove_lines(
         data,
         util.Params(
-            pos=StaticRand(pos),
+            start=StaticRand(start),
+            end=StaticRand(end),
         ),
     )
     assert result == bytearray(expected)
