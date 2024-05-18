@@ -376,6 +376,39 @@ def test_simplify_invalid_sample(
     assert "Invalid sample: invalid" in caplog.text
 
 
+def test_simplify_already_simplified(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    tmp_path: Path,
+) -> None:
+    crash_dir = tmp_path / "crash"
+    output_dir = tmp_path / "output"
+
+    crash_dir.mkdir()
+    output_dir.mkdir()
+    (crash_dir / "01-simp").write_bytes(b"simplified")
+    (output_dir / "01-simp").write_bytes(b"already simplified")
+
+    s = simplifier.Simp(  # pragma: no cover
+        crash_dir=crash_dir,
+        output_dir=output_dir,
+        target=lambda _: None,
+    )
+
+    with monkeypatch.context() as m, caplog.at_level(logging.INFO):
+        m.setattr(
+            s,
+            "_simplify",
+            lambda d: d if d.startswith(b"simp") else None,
+        )  # pragma: no cover
+        s.simplify()
+
+    assert output_dir.exists()
+    assert (output_dir / "01-simp").read_bytes() == b"already simplified"
+
+    assert "Already simplified: 01-simp" in caplog.text, caplog.text
+
+
 def test_metrics_copy() -> None:
     current = simplifier.Metrics(b"AB")
     previous = current
