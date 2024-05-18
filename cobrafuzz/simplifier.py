@@ -144,10 +144,14 @@ class Simp:
         for in_filename in self._crash_dir.glob("*"):
             if not in_filename.is_file():
                 continue
+            out_filename = self._output_dir / in_filename.name
+            if out_filename.exists():
+                logging.info("Already simplified: %s", out_filename.name)
+                continue
             if not self._output_dir.exists():
                 self._output_dir.mkdir()
-            out_filename = self._output_dir / in_filename.name
-            with in_filename.open("rb") as in_f, out_filename.open("wb") as out_f:
+
+            with in_filename.open("rb") as in_f:
                 data = in_f.read()
                 try:
                     simplified = self._simplify(data)
@@ -155,13 +159,14 @@ class Simp:
                     logging.warning("Invalid sample: %s", in_filename.name)
                     continue
 
-                if not simplified:
-                    logging.info("Could not simplify %s", in_filename.name)
-                    out_f.write(data)
-                    continue
+                with out_filename.open("wb") as out_f:
+                    if not simplified:
+                        logging.info("Could not simplify %s", in_filename.name)
+                        out_f.write(data)
+                        continue
 
-                logging.info("Simplified %s", in_filename.name)
-                out_f.write(simplified)
+                    logging.info("Simplified %s", in_filename.name)
+                    out_f.write(simplified)
 
     def _simplify(self, data: bytes) -> bytes:
         steps = 0
