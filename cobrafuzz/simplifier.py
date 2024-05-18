@@ -73,15 +73,15 @@ class Metrics:
         data: bytes,
         coverage: Optional[set[tuple[Optional[str], Optional[int], str, int]]] = None,
     ):
-        self._data = data
+        self.data = data
         self.coverage = coverage
 
     def __repr__(self) -> str:
-        return f"{self._data!r} [{self.metrics}]"
+        return f"{self.data!r} [{self.metrics}]"
 
     @property
     def metrics(self) -> list[int]:
-        return [len(self._data), len([n for n in self._data if n == ord("\n")])]
+        return [len(self.data), len([n for n in self.data if n == ord("\n")])]
 
     def improved_over(self, other: Metrics) -> bool:
         diff_metrics = list(zip(other.metrics, self.metrics))
@@ -176,43 +176,32 @@ class Simp:
                     logging.info("Simplified %s", in_filename.name)
                     out_f.write(simplified)
 
+    def _run_target(self, data: bytes) -> Optional[Metrics]:
+        try:
+            with disable_logging():
+                self._target(data)
+        except Exception as e:  # noqa: BLE001
+            return Metrics(data, util.covered(e.__traceback__, 1))
+
+        return None
+
     def _simplify(self, data: bytes) -> bytes:
         steps = 0
-        result = current_data = data
-        previous_metrics: Optional[Metrics] = None
+        result: Optional[Metrics] = self._run_target(data)
+
+        if result is None:
+            raise common.InvalidSampleError("No exception for sample")
 
         while steps <= self._steps:
             steps += 1
 
             modify, self._last_rands = self._mutators.sample()
+            current = self._run_target(data=modify(result.data, self._last_rands))
 
-            try:
-                with disable_logging():
-                    self._target(current_data)
-            except Exception as e:  # noqa: BLE001
-                current_metrics = Metrics(current_data, util.covered(e.__traceback__, 1))
-                if previous_metrics is None:
-                    previous_metrics = current_metrics
-                    continue
-            else:
-                if not previous_metrics:
-                    raise common.InvalidSampleError("No exception for sample")
-                current_data = modify(result, self._last_rands)
-                continue
-
-            if not current_metrics.equivalent_to(previous_metrics):
-                current_data = modify(result, self._last_rands)
-                continue
-
-            assert previous_metrics is not None
-
-            if current_metrics.improved_over(previous_metrics):
+            if current and current.equivalent_to(result) and current.improved_over(result):
                 self._last_rands.update(success=True)
                 self._mutators.update(success=True)
-                result = current_data
-                previous_metrics = current_metrics
+                result = current
                 steps = 0
 
-            current_data = modify(result, self._last_rands)
-
-        return result
+        return result.data
