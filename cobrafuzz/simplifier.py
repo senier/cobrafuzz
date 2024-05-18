@@ -68,8 +68,13 @@ def _simplify_shorten_token(
 
 
 class Metrics:
-    def __init__(self, data: bytes):
+    def __init__(
+        self,
+        data: bytes,
+        coverage: Optional[set[tuple[Optional[str], Optional[int], str, int]]] = None,
+    ):
         self._data = data
+        self.coverage = coverage
 
     def __repr__(self) -> str:
         return f"{self._data!r} [{self.metrics}]"
@@ -83,6 +88,9 @@ class Metrics:
         no_decline = all(s <= o for o, s in diff_metrics)
         some_improvement = any(s < o for o, s in diff_metrics)
         return no_decline and some_improvement
+
+    def equivalent_to(self, other: Metrics) -> bool:
+        return self.coverage == other.coverage
 
 
 @contextmanager
@@ -182,10 +190,8 @@ class Simp:
                 with disable_logging():
                     self._target(current_data)
             except Exception as e:  # noqa: BLE001
-                covered = util.covered(e.__traceback__, 1)
-                current_metrics = Metrics(current_data)
+                current_metrics = Metrics(current_data, util.covered(e.__traceback__, 1))
                 if previous_metrics is None:
-                    original_covered = covered
                     previous_metrics = current_metrics
                     continue
             else:
@@ -194,7 +200,7 @@ class Simp:
                 current_data = modify(result, self._last_rands)
                 continue
 
-            if covered != original_covered:
+            if not current_metrics.equivalent_to(previous_metrics):
                 current_data = modify(result, self._last_rands)
                 continue
 
