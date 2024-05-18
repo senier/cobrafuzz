@@ -413,7 +413,7 @@ def test_metrics_copy() -> None:
     current = simplifier.Metrics(b"AB")
     previous = current
     current = simplifier.Metrics(b"A")
-    assert current.improved_over(previous), f"{current=}, {previous=}"
+    assert previous < current, f"{current=}, {previous=}"
 
 
 @pytest.mark.parametrize(
@@ -441,7 +441,7 @@ def test_metrics_values(data: bytes, expected: list[int]) -> None:
     ],
 )
 def test_metrics_comp(less: bytes, more: bytes, improved: bool) -> None:
-    assert simplifier.Metrics(less).improved_over(simplifier.Metrics(more)) == improved
+    assert (simplifier.Metrics(more) < simplifier.Metrics(less)) == improved
 
 
 def target(data: bytes) -> None:

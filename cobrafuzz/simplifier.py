@@ -79,15 +79,19 @@ class Metrics:
     def __repr__(self) -> str:
         return f"{self.data!r} [{self.metrics}]"
 
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, self.__class__):
+            raise NotImplementedError
+
+        diff_metrics = list(zip(other.metrics, self.metrics))
+        no_decline = all(l <= r for l, r in diff_metrics)
+        some_improvement = any(l < r for l, r in diff_metrics)
+
+        return no_decline and some_improvement
+
     @property
     def metrics(self) -> list[int]:
         return [len(self.data), len([n for n in self.data if n == ord("\n")])]
-
-    def improved_over(self, other: Metrics) -> bool:
-        diff_metrics = list(zip(other.metrics, self.metrics))
-        no_decline = all(s <= o for o, s in diff_metrics)
-        some_improvement = any(s < o for o, s in diff_metrics)
-        return no_decline and some_improvement
 
     def equivalent_to(self, other: Metrics) -> bool:
         return self.coverage == other.coverage
@@ -176,12 +180,14 @@ class Simp:
                     logging.info("Simplified %s", in_filename.name)
                     out_f.write(simplified)
 
-    def _run_target(self, data: bytes) -> Optional[Metrics]:
+    def _run_target(self, data: bytes, previous: Optional[Metrics] = None) -> Optional[Metrics]:
         try:
             with disable_logging():
                 self._target(data)
         except Exception as e:  # noqa: BLE001
-            return Metrics(data, util.covered(e.__traceback__, 1))
+            result = Metrics(data, util.covered(e.__traceback__, 1))
+            if not previous or (result and result.equivalent_to(previous) and previous < result):
+                return result
 
         return None
 
@@ -196,9 +202,9 @@ class Simp:
             steps += 1
 
             modify, self._last_rands = self._mutators.sample()
-            current = self._run_target(data=modify(result.data, self._last_rands))
+            current = self._run_target(data=modify(result.data, self._last_rands), previous=result)
 
-            if current and current.equivalent_to(result) and current.improved_over(result):
+            if current:
                 self._last_rands.update(success=True)
                 self._mutators.update(success=True)
                 result = current
