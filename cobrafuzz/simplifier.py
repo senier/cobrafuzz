@@ -67,8 +67,22 @@ def _simplify_shorten_token(
     return b"".join(t[0] if t[1] != "Text" or t[0] != modify else t[0][:-1] for t in tokens)
 
 
-def _metrics(data: bytes) -> list[int]:
-    return [len(data), len([n for n in data if n == ord("\n")])]
+class Metrics:
+    def __init__(self, data: bytes):
+        self._data = data
+
+    def __repr__(self) -> str:
+        return f"{self._data!r} [{self.metrics}]"
+
+    @property
+    def metrics(self) -> list[int]:
+        return [len(self._data), len([n for n in self._data if n == ord("\n")])]
+
+    def improved_over(self, other: Metrics) -> bool:
+        diff_metrics = list(zip(other.metrics, self.metrics))
+        no_decline = all(s <= o for o, s in diff_metrics)
+        some_improvement = any(s < o for o, s in diff_metrics)
+        return no_decline and some_improvement
 
 
 @contextmanager
@@ -152,7 +166,7 @@ class Simp:
     def _simplify(self, data: bytes) -> bytes:
         steps = 0
         result = current_data = data
-        previous_metrics: Optional[list[int]] = None
+        previous_metrics: Optional[Metrics] = None
 
         while steps <= self._steps:
             steps += 1
@@ -164,7 +178,7 @@ class Simp:
                     self._target(current_data)
             except Exception as e:  # noqa: BLE001
                 covered = util.covered(e.__traceback__, 1)
-                current_metrics = _metrics(current_data)
+                current_metrics = Metrics(current_data)
                 if previous_metrics is None:
                     original_covered = covered
                     previous_metrics = current_metrics
@@ -179,11 +193,9 @@ class Simp:
                 current_data = modify(result, self._last_rands)
                 continue
 
-            diff_metrics = list(zip(current_metrics, previous_metrics))
-            no_decline = all(p >= c for c, p in diff_metrics)
-            improvement = any(p > c for c, p in diff_metrics)
+            assert previous_metrics is not None
 
-            if no_decline and improvement:
+            if current_metrics.improved_over(previous_metrics):
                 self._last_rands.update(success=True)
                 self._mutators.update(success=True)
                 result = current_data

@@ -376,10 +376,39 @@ def test_simplify_invalid_sample(
     assert "Invalid sample: invalid" in caplog.text
 
 
-def test_metrics() -> None:
-    assert simplifier._metrics(b"") == [0, 0]
-    assert simplifier._metrics(b"single line") == [11, 0]
-    assert simplifier._metrics(b"two\nlines") == [9, 1]
+def test_metrics_copy() -> None:
+    current = simplifier.Metrics(b"AB")
+    previous = current
+    current = simplifier.Metrics(b"A")
+    assert current.improved_over(previous), f"{current=}, {previous=}"
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        (b"", [0, 0]),
+        (b"single line", [11, 0]),
+        (b"two\nlines", [9, 1]),
+    ],
+)
+def test_metrics_values(data: bytes, expected: list[int]) -> None:
+    assert simplifier.Metrics(data).metrics == expected
+
+
+@pytest.mark.parametrize(
+    ("less", "more", "improved"),
+    [
+        (b"", b"x", True),
+        (b"x", b"x\ny", True),
+        (b"x", "xy", True),
+        (b"x", "x", False),
+        (b"x", "", False),
+        (b"xy", "x", False),
+        (b"x\ny", b"x", False),
+    ],
+)
+def test_metrics_comp(less: bytes, more: bytes, improved: bool) -> None:
+    assert simplifier.Metrics(less).improved_over(simplifier.Metrics(more)) == improved
 
 
 def target(data: bytes) -> None:
