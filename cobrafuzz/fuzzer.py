@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import atexit
 import hashlib
 import io
 import logging
@@ -391,16 +392,23 @@ class Fuzzer:
         return result, queue
 
     def _terminate_workers(self) -> None:
+        if not self._workers:
+            return
+
         self._result_queue.cancel_join_thread()
+
         for p, q in self._workers:
             q.cancel_join_thread()
             p.terminate()
             p.join(timeout=1)
 
+        del self._workers[:]
+
     def start(self) -> None:  # noqa: PLR0912
         start_time = time.time()
 
         self._workers = [self._initialize_process(wid=wid) for wid in range(self._num_workers)]
+        atexit.register(self._terminate_workers)
 
         logging.info(
             "START units: %d, workers: %d, seeds: %d",

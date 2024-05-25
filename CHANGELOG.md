@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Crash result simplification (#30)
 - Configurable simplification steps (#54)
 - Parallel simplification (#53)
+- Terminate fuzzer workers in atexit() handler
 
 ### Changed
 

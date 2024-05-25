@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import logging
 import multiprocessing
@@ -650,6 +651,10 @@ def test_terminate_workers(monkeypatch: pytest.MonkeyPatch) -> None:
         assert all(
             w[0].terminated and w[0].joined and w[0].timeout == 1 and w[1].canceled for w in workers
         )
+
+        previous_workers = copy.copy(workers)
+        f._terminate_workers()  # noqa: SLF001
+        assert workers == previous_workers
 
 
 def test_worker_run_ignored_exception() -> None:
