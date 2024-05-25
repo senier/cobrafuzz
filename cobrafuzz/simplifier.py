@@ -5,9 +5,8 @@ import logging
 import multiprocessing as mp
 import re
 import time
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Iterator, Optional, Union, cast
+from typing import Callable, Optional, Union, cast
 
 import dill as pickle  # type: ignore[import-untyped]
 
@@ -105,20 +104,9 @@ class Metrics:
         return self.coverage == other.coverage
 
 
-@contextmanager
-def disable_logging() -> Iterator[None]:
-    previous_level = logging.root.manager.disable
-    logging.disable(logging.CRITICAL)
-
-    try:
-        yield
-    finally:
-        logging.disable(previous_level)
-
-
 def run_target(target: Callable[[bytes], None], data: bytes) -> Optional[Metrics]:
     try:
-        with disable_logging():
+        with util.disable_logging():
             target(data)
     except Exception as e:  # noqa: BLE001
         return Metrics(data, util.covered(e.__traceback__, 1))
