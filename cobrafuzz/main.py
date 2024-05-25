@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-from cobrafuzz import fuzzer, simplifier
+from cobrafuzz import fuzzer, prune, simplifier
 
 
 class CobraFuzz:
@@ -22,6 +22,12 @@ class CobraFuzz:
         )
 
         subparsers = parser.add_subparsers(dest="subcommands")
+
+        parser_prune = subparsers.add_parser(
+            "prune",
+            help="Prune invalid files from crash directory.",
+        )
+        parser_prune.set_defaults(func=self.prune)
 
         parser_show = subparsers.add_parser(
             "show",
@@ -144,6 +150,9 @@ class CobraFuzz:
             parser.exit(3)
 
         args.func(args)
+
+    def prune(self, args: argparse.Namespace) -> None:
+        prune.prune(crash_dir=args.crash_dir, target=self.function)
 
     def show(self, args: argparse.Namespace) -> None:
         fuzzer.Fuzzer(crash_dir=args.crash_dir, target=self.function, regression=True)

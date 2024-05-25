@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 import random
 from abc import abstractmethod
+from contextlib import contextmanager
 from types import TracebackType
-from typing import Generator, Generic, Optional, TypeVar
+from typing import Generator, Generic, Iterator, Optional, TypeVar
 
 from . import common
 
@@ -223,3 +225,14 @@ def covered(
         prev_file = tb.tb_frame.f_code.co_filename
         tb = tb.tb_next
     return set(result[skip_first_n:])
+
+
+@contextmanager
+def disable_logging() -> Iterator[None]:
+    previous_level = logging.root.manager.disable
+    logging.disable(logging.CRITICAL)
+
+    try:
+        yield
+    finally:
+        logging.disable(previous_level)

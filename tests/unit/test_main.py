@@ -6,7 +6,7 @@ from typing import Callable, Optional, Union
 
 import pytest
 
-from cobrafuzz import fuzzer, simplifier
+from cobrafuzz import fuzzer, prune, simplifier
 from cobrafuzz.main import CobraFuzz
 
 
@@ -105,6 +105,31 @@ def test_main_simp(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         assert args["crash_dir"] == tmp_path / "crash"
         assert args["output_dir"] == tmp_path / "output"
         assert args["target"] is not None
+
+
+def test_main_prune(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    args: Optional[dict[str, Union[Path, Callable[[bytes], None]]]] = None
+
+    def dummy_prune(**a: Union[Path, Callable[[bytes], None]]) -> None:
+        nonlocal args
+        args = a
+
+    with monkeypatch.context() as mp:
+        mp.setattr(
+            sys,
+            "argv",
+            [
+                "main",
+                "--crash-dir",
+                str(tmp_path),
+                "prune",
+            ],
+        )
+        mp.setattr(prune, "prune", dummy_prune)
+        c = CobraFuzz(lambda _: None)  # pragma: no cover
+        c()
+        assert args is not None
+        assert args["crash_dir"] == tmp_path
 
 
 def test_main_no_subcommand(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
