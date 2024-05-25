@@ -34,6 +34,17 @@ class CobraFuzz:
             help="Simplify crashes output.",
         )
         parser_simp.add_argument(
+            "-j",
+            "--num-workers",
+            type=int,
+            help="Number of parallel workers (default: one less than CPUs available).",
+        )
+        parser_simp.add_argument(
+            "--max-time",
+            type=int,
+            help="Maximum number of seconds to run.",
+        )
+        parser_simp.add_argument(
             "--output-dir",
             type=Path,
             required=True,
@@ -152,7 +163,6 @@ class CobraFuzz:
             start_method=args.start_method,
             state_file=args.state_file,
             simplify=args.simplify,
-            simp_steps=args.simp_steps,
         )
         logging.basicConfig(format="[%(asctime)s] %(message)s")
         try:
@@ -165,5 +175,6 @@ class CobraFuzz:
             crash_dir=args.crash_dir,
             target=self.function,
             output_dir=args.output_dir,
-            steps=args.steps,
+            max_time=args.max_time,
+            num_workers=args.num_workers,
         ).simplify()

@@ -70,6 +70,6 @@ def test_simplify(
         crash_dir=tmp_path / "crash",
         output_dir=tmp_path / "output",
         target=target,
-        steps=10000,
+        max_time=5,
     )
     assert s._simplify(data) == expected  # noqa: SLF001

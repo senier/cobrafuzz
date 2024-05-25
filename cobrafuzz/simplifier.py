@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import atexit
 import logging
+import multiprocessing as mp
 import re
+import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Iterator, Optional
+from typing import Callable, Iterator, Optional, Union, cast
+
+import dill as pickle  # type: ignore[import-untyped]
 
 from cobrafuzz import common, util
+
+MPContext = Union[mp.context.ForkContext, mp.context.ForkServerContext, mp.context.SpawnContext]
+MPProcess = Union[mp.context.ForkProcess, mp.context.ForkServerProcess, mp.context.SpawnProcess]
 
 
 def _simplify_remove_lines(
@@ -108,49 +116,124 @@ def disable_logging() -> Iterator[None]:
         logging.disable(previous_level)
 
 
-class Simp:
-    def __init__(
-        self,
-        crash_dir: Path,
-        output_dir: Path,
-        target: Callable[[bytes], None],
-        steps: int = 10000,
-    ) -> None:
-        self._target = target
-        self._crash_dir = crash_dir
-        self._output_dir = output_dir
-        self._steps = steps
+def run_target(target: Callable[[bytes], None], data: bytes) -> Optional[Metrics]:
+    try:
+        with disable_logging():
+            target(data)
+    except Exception as e:  # noqa: BLE001
+        return Metrics(data, util.covered(e.__traceback__, 1))
+    return None
 
-        self._mutators: util.AdaptiveChoiceBase[
+
+def simplifier(
+    target_bytes: bytes,
+    request_queue: mp.Queue[Optional[Metrics]],
+    result_queue: mp.Queue[Optional[Metrics]],
+    mutators: Optional[
+        util.AdaptiveChoiceBase[
             tuple[
                 Callable[[bytes, util.Params], bytes],
                 util.Params,
             ]
-        ] = util.AdaptiveChoiceBase(
-            population=[
-                (
-                    _simplify_remove_lines,
-                    util.Params(
-                        start=util.AdaptiveRange(),
-                        end=util.AdaptiveRange(),
-                    ),
-                ),
-                (
-                    _simplify_remove_characters,
-                    util.Params(
-                        start=util.AdaptiveRange(),
-                        length=util.AdaptiveRange(),
-                    ),
-                ),
-                (
-                    _simplify_shorten_token,
-                    util.Params(
-                        pos=util.AdaptiveRange(),
-                        pattern=util.AdaptiveRange(),
-                    ),
-                ),
-            ],
+        ]
+    ] = None,
+) -> None:
+    target = cast(Callable[[bytes], None], pickle.loads(target_bytes))  # noqa: S301
+
+    mutators = mutators or util.AdaptiveChoiceBase(
+        population=[
+            (
+                _simplify_remove_lines,
+                util.Params(start=util.AdaptiveRange(), end=util.AdaptiveRange()),
+            ),
+            (
+                _simplify_remove_characters,
+                util.Params(start=util.AdaptiveRange(), length=util.AdaptiveRange()),
+            ),
+            (
+                _simplify_shorten_token,
+                util.Params(pos=util.AdaptiveRange(), pattern=util.AdaptiveRange()),
+            ),
+        ],
+    )
+
+    while True:
+        request = request_queue.get()
+        if request is None:
+            return
+
+        modify, last_rands = mutators.sample()
+        result = run_target(target, modify(request.data, last_rands))
+        if result and result.equivalent_to(request) and request < result:
+            result_queue.put(result)
+            last_rands.update(success=True)
+            mutators.update(success=True)
+            continue
+
+        result_queue.put(None)
+
+
+class Simp:
+    def __init__(  # noqa: PLR0913
+        self,
+        crash_dir: Path,
+        output_dir: Path,
+        target: Callable[[bytes], None],
+        max_time: Optional[int] = None,
+        start_method: Optional[str] = None,
+        num_workers: int = 1,
+    ) -> None:
+        self._target = target
+        self._crash_dir = crash_dir
+        self._output_dir = output_dir
+        self._max_time = max_time or 60
+
+        mp_ctx: MPContext = (
+            mp.get_context("fork")
+            if start_method == "fork"
+            else mp.get_context("forkserver")
+            if start_method == "forkserver"
+            else mp.get_context("spawn")
         )
+
+        self._num_workers: int = num_workers or mp_ctx.cpu_count() - 1
+        self._result_queue: mp.Queue[Optional[Metrics]] = mp_ctx.Queue()
+        queue: mp.Queue[Optional[Metrics]] = mp_ctx.Queue(100)
+        self._workers = [
+            (
+                mp_ctx.Process(
+                    target=simplifier,
+                    args=(
+                        pickle.dumps(self._target),
+                        queue,
+                        self._result_queue,
+                    ),
+                ),
+                queue,
+            )
+            for _ in range(self._num_workers)
+        ]
+        for p, _ in self._workers:
+            p.start()
+
+        atexit.register(self.terminate_workers)
+
+    def terminate_workers(self) -> None:
+        if not self._workers:
+            return
+
+        for _, q in self._workers:
+            q.put(None)
+        time.sleep(1)
+
+        self._result_queue.cancel_join_thread()
+
+        for p, q in self._workers:
+            q.cancel_join_thread()
+            p.terminate()
+            p.join(timeout=1)
+
+        del self._workers[:]
 
     def simplify(self) -> None:
         for in_filename in self._crash_dir.glob("*"):
@@ -180,34 +263,22 @@ class Simp:
                     logging.info("Simplified %s", in_filename.name)
                     out_f.write(simplified)
 
-    def _run_target(self, data: bytes, previous: Optional[Metrics] = None) -> Optional[Metrics]:
-        try:
-            with disable_logging():
-                self._target(data)
-        except Exception as e:  # noqa: BLE001
-            result = Metrics(data, util.covered(e.__traceback__, 1))
-            if not previous or (result and result.equivalent_to(previous) and previous < result):
-                return result
-
-        return None
-
     def _simplify(self, data: bytes) -> bytes:
-        steps = 0
-        result: Optional[Metrics] = self._run_target(data)
+        start = time.time()
+        best = run_target(self._target, data)
 
-        if result is None:
+        if not best:
             raise common.InvalidSampleError("No exception for sample")
 
-        while steps <= self._steps:
-            steps += 1
+        while time.time() - start < self._max_time:
+            while not self._result_queue.empty():
+                result = self._result_queue.get()
 
-            modify, self._last_rands = self._mutators.sample()
-            current = self._run_target(data=modify(result.data, self._last_rands), previous=result)
+                if result is not None and best < result:
+                    best = result
 
-            if current:
-                self._last_rands.update(success=True)
-                self._mutators.update(success=True)
-                result = current
-                steps = 0
+            for _, queue in self._workers:
+                if not queue.full():
+                    queue.put(best)
 
-        return result.data
+        return best.data
