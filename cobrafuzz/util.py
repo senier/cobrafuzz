@@ -236,3 +236,14 @@ def disable_logging() -> Iterator[None]:
         yield
     finally:
         logging.disable(previous_level)
+
+
+def hexdump(title: str, data: bytes) -> str:
+    length = 16
+    result = [title]
+    for i in range(0, len(data), length):
+        chunk = data[i : i + length]
+        hex_chunk = " ".join(f"{b:02x}" for b in chunk)
+        ascii_chunk = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
+        result.append(f"{i:08x}: {hex_chunk:<{length*3}} {ascii_chunk}")
+    return "\n".join(result)

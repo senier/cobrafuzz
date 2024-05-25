@@ -366,12 +366,8 @@ class Fuzzer:
             logging.info("Crash dir created (%s)", self._crash_dir)
 
         crash_path = self._crash_dir / (prefix + m.hexdigest())
-
-        with crash_path.open("wb") as f:
-            f.write(buf)
-        logging.info("sample was written to %s", crash_path)
-        if len(buf) < 200:
-            logging.info("sample = %s", buf.hex())
+        crash_path.write_bytes(buf)
+        logging.info(util.hexdump(title=f"Sample written to {crash_path.name}:", data=buf))
 
     def _initialize_process(self, wid: int) -> tuple[MPProcess, mp.Queue[Update]]:
         queue: mp.Queue[Update] = self._mp_ctx.Queue()

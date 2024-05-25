@@ -13,7 +13,7 @@ from typing import Callable, Optional, Tuple, Union, cast
 import dill  # type: ignore[import-untyped]
 import pytest
 
-from cobrafuzz import fuzzer, simplifier, state as st
+from cobrafuzz import fuzzer, simplifier, state as st, util
 from tests import utils
 
 
@@ -102,7 +102,7 @@ def test_write_sample(
     assert artifact.is_file()
     with artifact.open("rb") as af:
         assert af.read() == sample
-    assert length >= 200 or f"sample = {sample.hex()}" in caplog.text
+    assert util.hexdump(title="", data=sample) in caplog.text
 
 
 def test_regression_valid(caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
@@ -464,8 +464,7 @@ def test_start_error(
     assert caplog.record_tuples == [
         ("root", logging.INFO, "START units: 1, workers: 1, seeds: 0"),
         ("root", logging.INFO, "Test error message"),
-        ("root", logging.INFO, f"sample was written to {tmp_path / filename}"),
-        ("root", logging.INFO, "sample = 6465616462656566"),
+        ("root", logging.INFO, util.hexdump(title=f"Sample written to {filename}:", data=data)),
         ("root", logging.INFO, "Found 1 crashes, stopping."),
     ]
 
@@ -522,8 +521,7 @@ def test_start_simplify(
         ("root", logging.INFO, "START units: 1, workers: 1, seeds: 0"),
         ("root", logging.INFO, "Test error message"),
         ("root", logging.INFO, f"Crash dir created ({crash_path})"),
-        ("root", logging.INFO, f"sample was written to {crash_path / filename}"),
-        ("root", logging.INFO, "sample = 6465616462656566"),
+        ("root", logging.INFO, util.hexdump(title=f"Sample written to {filename}:", data=data)),
         ("root", logging.INFO, "Found 1 crashes, stopping."),
     ]
 

@@ -230,3 +230,35 @@ def test_non_adaptive_choice() -> None:
     c.append(2)
     assert c._population == [1, 2]
     assert c._distribution is None
+
+
+@pytest.mark.parametrize(
+    ("title", "data", "expected"),
+    [
+        ("", b"", ""),
+        (
+            "some title",
+            b"x",
+            "some title\n00000000: 78                                               x",
+        ),
+        (
+            "some other title",
+            b"xy",
+            "some other title\n00000000: 78 79                                            xy",
+        ),
+        (
+            "title:",
+            b"0123456780123456",
+            "title:\n00000000: 30 31 32 33 34 35 36 37 38 30 31 32 33 34 35 36  0123456780123456",
+        ),
+        (
+            "title:",
+            b"012345678012345678",
+            "title:\n"
+            "00000000: 30 31 32 33 34 35 36 37 38 30 31 32 33 34 35 36  0123456780123456\n"
+            "00000010: 37 38                                            78",
+        ),
+    ],
+)
+def test_hexdump(title: str, data: bytes, expected: str) -> None:
+    assert util.hexdump(title, data) == expected
