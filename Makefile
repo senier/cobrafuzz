@@ -55,6 +55,12 @@ fuzz-%:
 show-%:
 	@$(PYTHON) examples/fuzz_$*/fuzz.py --crash-dir examples/fuzz_$*/crashes show
 
+prune-%:
+	@$(PYTHON) examples/fuzz_$*/fuzz.py --crash-dir examples/fuzz_$*/crashes prune
+
+simp-%:
+	@$(PYTHON) examples/fuzz_$*/fuzz.py --crash-dir examples/fuzz_$*/crashes simp --output-dir examples/fuzz_$*/simplified --max-time 600
+
 clean-%:
 	@rm -f examples/fuzz_$*/state.json
 	@rm -f examples/fuzz_$*/crashes/*
