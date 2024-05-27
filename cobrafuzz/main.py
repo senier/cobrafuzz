@@ -56,15 +56,6 @@ class CobraFuzz:
             required=True,
             help="Simplified output directory.",
         )
-        parser_simp.add_argument(
-            "--steps",
-            type=int,
-            help=(
-                "Number of unsuccessful steps before stopping simplification "
-                "(default: %(default)d)."
-            ),
-            default=10000,
-        )
         parser_simp.set_defaults(func=self.simp)
 
         parser_fuzz = subparsers.add_parser(
@@ -126,15 +117,6 @@ class CobraFuzz:
             "--simplify",
             type=Path,
             help="Run simplifier and store results in directory.",
-        )
-        parser_fuzz.add_argument(
-            "--simp-steps",
-            type=int,
-            help=(
-                "Number of unsuccessful steps before stopping simplification "
-                "(default: %(default)d)."
-            ),
-            default=10000,
         )
 
         parser_fuzz.add_argument(
