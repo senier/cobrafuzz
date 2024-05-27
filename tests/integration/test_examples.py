@@ -13,6 +13,7 @@ import pytest
         "charset_normalizer",
         "cobrafuzz",
         "codeop",
+        "dateutil",
         "furl",
         "htmlparser",
         "idna",
